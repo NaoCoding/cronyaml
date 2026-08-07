@@ -1,6 +1,6 @@
 {
   "name": "cronyaml",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A lightweight YAML-based cron job scheduler for Node.js",
   "type": "module",
   "license": "MIT",
