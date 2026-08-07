@@ -4,6 +4,8 @@
 
 CronYAML is a lightweight Node.js scheduler for running shell commands from a simple YAML file. It keeps the scheduler in the foreground and never modifies the system crontab.
 
+Repository: [github.com/NaoCoding/cronyaml](https://github.com/NaoCoding/cronyaml)
+
 ## Installation
 
 ```bash
@@ -46,6 +48,16 @@ jobs:
 ```
 
 CronYAML downloads the script when the job runs and keeps a local cache for offline fallback. Supported runtimes are `bash`, `sh`, `node`, `python`, and `powershell`. Prefer a URL pinned to a commit SHA for predictable execution, for example `https://raw.githubusercontent.com/my-org/scripts/<commit>/backup.sh`.
+
+## Remote script example
+
+The repository includes [example.yaml](./example.yaml), which runs the example script from GitHub:
+
+```bash
+npx cronyaml validate --file example.yaml
+npx cronyaml exec remote-example --file example.yaml
+npx cronyaml run --file example.yaml
+```
 
 ## CLI
 

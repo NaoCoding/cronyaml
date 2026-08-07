@@ -1,0 +1,8 @@
+version: 1
+
+jobs:
+  remote-example:
+    schedule: "*/5 * * * *"
+    source: "https://github.com/NaoCoding/cronyaml/blob/main/examples/remote/hello.js"
+    args:
+      - "Hello from the GitHub example script"
