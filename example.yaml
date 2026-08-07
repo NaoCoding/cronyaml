@@ -1,6 +1,7 @@
 version: 1
 
 jobs:
+  # General example
   hello:
     schedule: "* * * * *"
     command: "echo 'Hello from CronYAML'"
@@ -9,3 +10,18 @@ jobs:
     source: "https://github.com/NaoCoding/cronyaml/blob/main/examples/remote/hello.js"
     args:
       - "Hello from the GitHub example script"
+
+  # Gmail example
+  gmail-example:
+    # Copy .env.example to .env and replace the Gmail values before running.
+    schedule: "0 9 * * 1-5"
+    source: "https://github.com/NaoCoding/cronyaml/blob/main/examples/gmail/send-email.js"
+    runtime: node
+    env:
+      GMAIL_ACCESS_TOKEN: "${GMAIL_ACCESS_TOKEN}"
+      GMAIL_TO: "${GMAIL_TO}"
+      GMAIL_SUBJECT: "${GMAIL_SUBJECT}"
+      GMAIL_BODY: "${GMAIL_BODY}"
+    timeout: "30s"
+    concurrency:
+      policy: forbid
