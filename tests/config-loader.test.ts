@@ -41,4 +41,28 @@ describe("configuration loader", () => {
     writeFileSync(join(directory, "cron.yaml"), "version: 1\njobs:\n  job:\n    schedule: '* * * * *'\n    command: echo ${CRONYAML_TEST_MISSING}\n");
     expect(() => loadConfig(undefined, directory)).toThrow(ConfigError);
   });
+
+  it("loads a GitHub source and infers its script runtime", () => {
+    const directory = tempProject();
+    writeFileSync(join(directory, "cron.yaml"), [
+      "version: 1",
+      "jobs:",
+      "  remote:",
+      "    schedule: '* * * * *'",
+      "    source: https://github.com/example/scripts/blob/main/hello.py",
+      "    args:",
+      "      - world",
+      "",
+    ].join("\n"));
+    const job = loadConfig(undefined, directory).jobs[0];
+    expect(job?.source).toBe("https://github.com/example/scripts/blob/main/hello.py");
+    expect(job?.args).toEqual(["world"]);
+    expect(job?.command).toBeUndefined();
+  });
+
+  it("requires exactly one command source", () => {
+    const directory = tempProject();
+    writeFileSync(join(directory, "cron.yaml"), "version: 1\njobs:\n  job:\n    schedule: '* * * * *'\n");
+    expect(() => loadConfig(undefined, directory)).toThrow(ConfigError);
+  });
 });

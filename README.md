@@ -35,6 +35,18 @@ jobs:
       policy: forbid
 ```
 
+Instead of a local command, a job can download and run a script from GitHub. The runtime is inferred from the file extension, and `runtime` can be set explicitly when needed:
+
+```yaml
+jobs:
+  remote-backup:
+    schedule: "0 3 * * *"
+    source: "https://github.com/my-org/scripts/blob/main/backup.sh"
+    args: ["--full"]
+```
+
+CronYAML downloads the script when the job runs and keeps a local cache for offline fallback. Supported runtimes are `bash`, `sh`, `node`, `python`, and `powershell`. Prefer a URL pinned to a commit SHA for predictable execution, for example `https://raw.githubusercontent.com/my-org/scripts/<commit>/backup.sh`.
+
 ## CLI
 
 ```text
@@ -49,7 +61,7 @@ Use `--file` to override discovery, for example `cronyaml run --file config/jobs
 
 ## Configuration
 
-Required fields are `version: 1`, `jobs`, `schedule`, and `command`. Jobs can also set `cwd`, `env`, `enabled`, `timezone`, `timeout`, `retry`, and `concurrency`.
+Required fields are `version: 1`, `jobs`, `schedule`, and exactly one of `command` or `source`. Jobs can also set `cwd`, `env`, `enabled`, `timezone`, `timeout`, `retry`, and `concurrency`. Remote jobs additionally support `runtime` and `args`.
 
 Relative `cwd` paths are resolved from the directory containing `cron.yaml`. The scheduler validates all enabled and disabled jobs before starting.
 
@@ -70,7 +82,7 @@ jobs:
       NODE_ENV: production
 ```
 
-Treat configuration files as executable code: CronYAML intentionally runs shell commands and should not load untrusted YAML.
+Treat configuration files and remote sources as executable code: CronYAML intentionally runs commands and downloaded scripts with the current user's permissions. Only use trusted YAML and GitHub sources.
 
 ## Docker
 
@@ -91,7 +103,7 @@ scheduler.start();
 
 ## Scope
 
-CronYAML v1 supports command jobs, retries, timeouts, environment interpolation, timezone validation, overlap prevention, and graceful shutdown. It does not provide persistent history, distributed locks, HTTP jobs, notifications, or hot reloading.
+CronYAML v1 supports command and GitHub source jobs, retries, timeouts, environment interpolation, timezone validation, overlap prevention, and graceful shutdown. It does not provide persistent history, distributed locks, HTTP jobs, notifications, or hot reloading.
 
 ## License
 

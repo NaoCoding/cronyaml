@@ -7,10 +7,15 @@ export interface ConcurrencyConfig {
   policy: "allow" | "forbid";
 }
 
+export type ScriptRuntime = "bash" | "sh" | "node" | "python" | "powershell";
+
 export interface JobConfig {
   name: string;
   schedule: string;
-  command: string;
+  command?: string;
+  source?: string;
+  runtime?: ScriptRuntime;
+  args?: string[];
   cwd?: string;
   env?: Record<string, string>;
   timeout?: string;
@@ -20,14 +25,25 @@ export interface JobConfig {
   retry: RetryConfig;
 }
 
+export interface RawJobConfig {
+  schedule: string;
+  command?: string;
+  source?: string;
+  runtime?: ScriptRuntime;
+  args?: string[];
+  cwd?: string;
+  env?: Record<string, string>;
+  timeout?: string;
+  enabled?: boolean;
+  timezone?: string;
+  concurrency?: Partial<ConcurrencyConfig>;
+  retry?: Partial<RetryConfig>;
+}
+
 export interface CronYamlFile {
   version: 1;
   defaults?: { timezone?: string; timeout?: string };
-  jobs: Record<string, Omit<JobConfig, "name" | "enabled" | "concurrency" | "retry"> & {
-    enabled?: boolean;
-    concurrency?: Partial<ConcurrencyConfig>;
-    retry?: Partial<RetryConfig>;
-  }>;
+  jobs: Record<string, RawJobConfig>;
 }
 
 export interface ValidatedConfig {

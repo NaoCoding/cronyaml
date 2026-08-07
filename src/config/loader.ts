@@ -8,6 +8,7 @@ import { parseDuration } from "../utils/duration.js";
 import { DEFAULT_CONFIG_FILENAMES, findConfigPath } from "../utils/paths.js";
 import { rawConfigSchema } from "./schema.js";
 import type { CronYamlFile, JobConfig, ValidatedConfig } from "../types.js";
+import { normalizeGitHubSource } from "../executor/remote-script.js";
 
 const NAME_PATTERN = /^[A-Za-z0-9._-]+$/;
 const ENV_PATTERN = /\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g;
@@ -90,10 +91,20 @@ export function loadConfig(file?: string, cwd = process.cwd()): ValidatedConfig 
     parseDuration(retry.delay, `jobs.${name}.retry.delay`);
     const jobCwd = job.cwd ? (isAbsolute(job.cwd) ? job.cwd : resolve(directory, job.cwd)) : directory;
     if (!existsSync(jobCwd) || !statSync(jobCwd).isDirectory()) throw new ConfigError(`jobs.${name}.cwd: directory does not exist: ${jobCwd}`);
+    if (job.source) {
+      try {
+        normalizeGitHubSource(job.source);
+      } catch (error) {
+        throw new ConfigError(`jobs.${name}.source: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
     return {
       name,
       schedule: job.schedule,
       command: job.command,
+      source: job.source,
+      runtime: job.runtime,
+      args: job.args ?? [],
       cwd: jobCwd,
       env: { ...dotenvValues, ...process.env, ...job.env } as Record<string, string>,
       timeout,

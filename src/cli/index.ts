@@ -47,6 +47,7 @@ program.command("validate")
     for (const job of config.jobs) {
       console.log(`${pc.cyan(job.name)}${job.enabled ? "" : " (disabled)"}`);
       console.log(`  Schedule: ${job.schedule}`);
+      if (job.source) console.log(`  Source: ${job.source}`);
       if (job.timezone) console.log(`  Timezone: ${job.timezone}`);
       console.log();
     }
@@ -58,8 +59,8 @@ program.command("list")
   .option("--file <path>", "configuration path")
   .action((options: { file?: string }) => {
     const config = loadConfig(options.file);
-    console.log("NAME\tSCHEDULE\tTIMEZONE\tENABLED");
-    for (const job of config.jobs) console.log(`${job.name}\t${job.schedule}\t${job.timezone ?? "local"}\t${job.enabled ? "yes" : "no"}`);
+    console.log("NAME\tSCHEDULE\tSOURCE\tTIMEZONE\tENABLED");
+    for (const job of config.jobs) console.log(`${job.name}\t${job.schedule}\t${job.source ? "github" : "command"}\t${job.timezone ?? "local"}\t${job.enabled ? "yes" : "no"}`);
   });
 
 program.command("exec <job>")

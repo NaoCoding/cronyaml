@@ -1,6 +1,7 @@
-import { execaCommand } from "execa";
+import { execa, execaCommand } from "execa";
 import type { JobConfig } from "../types.js";
 import { parseDuration } from "../utils/duration.js";
+import { resolveRemoteScript } from "./remote-script.js";
 
 export interface CommandResult {
   success: boolean;
@@ -14,13 +15,15 @@ export interface CommandResult {
 
 export async function executeCommand(job: JobConfig): Promise<CommandResult> {
   try {
-    const result = await execaCommand(job.command, {
-      shell: true,
+    const options = {
       cwd: job.cwd,
       env: job.env,
       reject: false,
       timeout: job.timeout ? parseDuration(job.timeout, `${job.name}.timeout`) : undefined,
-    });
+    };
+    const result = job.source
+      ? await resolveRemoteScript(job.source, job.runtime, job.args ?? []).then(({ file, args }) => execa(file, args, options))
+      : await execaCommand(job.command as string, { ...options, shell: true });
     return {
       success: result.exitCode === 0 && !result.timedOut,
       exitCode: result.exitCode,
