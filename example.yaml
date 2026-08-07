@@ -2,6 +2,9 @@ version: 1
 
 jobs:
   hello:
+    schedule: "* * * * *"
+    command: "echo 'Hello from CronYAML'"
+  hello_remote:
     schedule: "*/5 * * * *"
     source: "https://github.com/NaoCoding/cronyaml/blob/main/examples/remote/hello.js"
     args:
