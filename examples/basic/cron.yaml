@@ -1,0 +1,6 @@
+version: 1
+
+jobs:
+  heartbeat:
+    schedule: "*/5 * * * *"
+    command: "node scripts/heartbeat.js"

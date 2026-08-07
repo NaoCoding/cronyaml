@@ -1,0 +1,6 @@
+version: 1
+
+jobs:
+  hello:
+    schedule: "* * * * *"
+    command: "echo 'Hello from CronYAML'"
