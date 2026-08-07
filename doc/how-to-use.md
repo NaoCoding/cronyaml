@@ -99,6 +99,7 @@ jobs:
 | `source` | An HTTPS GitHub file URL. Use this or `command`, but not both. |
 | `runtime` | Runtime for a remote script: `bash`, `sh`, `node`, `python`, or `powershell`. Inferred from the file extension when omitted. |
 | `args` | String arguments passed to a remote script. Requires `source`. |
+| `use-cached` | Allow a remote job to use its previous cached script when downloading fails. Defaults to `false`, so remote jobs download the script on every run. Requires `source`. |
 | `cwd` | Working directory for the job. Relative paths are resolved from the configuration file's directory. |
 | `env` | Environment variables added to the job. `${NAME}` placeholders are interpolated before validation. |
 | `enabled` | Whether the job starts with `run`. Defaults to `true`. |
@@ -110,8 +111,10 @@ jobs:
 
 ## Run a remote GitHub script
 
-Remote jobs download the script when they run and keep a local cache for
-offline fallback. GitHub `blob` URLs are accepted and normalized internally:
+Remote jobs download the script when they run. By default, a download failure
+causes the job to fail rather than running an old cached script. Set
+`use-cached: true` only when offline fallback is desired. GitHub `blob` URLs are
+accepted and normalized internally:
 
 ```yaml
 version: 1
@@ -121,6 +124,7 @@ jobs:
     schedule: "*/5 * * * *"
     source: "https://github.com/NaoCoding/cronyaml/blob/main/examples/remote/hello.js"
     args: ["world"]
+    # use-cached: true
 ```
 
 For reproducible execution, prefer a URL pinned to a commit SHA, for example:

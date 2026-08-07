@@ -53,7 +53,7 @@ jobs:
     args: ["--full"]
 ```
 
-CronYAML downloads the script when the job runs and keeps a local cache for offline fallback. Supported runtimes are `bash`, `sh`, `node`, `python`, and `powershell`. Prefer a URL pinned to a commit SHA for predictable execution, for example `https://raw.githubusercontent.com/my-org/scripts/<commit>/backup.sh`.
+CronYAML downloads the script when the job runs. Remote jobs always download a fresh copy by default; set `use-cached: true` to allow fallback to a previous cached copy when downloading fails. Supported runtimes are `bash`, `sh`, `node`, `python`, and `powershell`. Prefer a URL pinned to a commit SHA for predictable execution, for example `https://raw.githubusercontent.com/my-org/scripts/<commit>/backup.sh`.
 
 ## Remote script example
 

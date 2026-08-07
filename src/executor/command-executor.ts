@@ -22,7 +22,8 @@ export async function executeCommand(job: JobConfig): Promise<CommandResult> {
       timeout: job.timeout ? parseDuration(job.timeout, `${job.name}.timeout`) : undefined,
     };
     const result = job.source
-      ? await resolveRemoteScript(job.source, job.runtime, job.args ?? []).then(({ file, args }) => execa(file, args, options))
+      ? await resolveRemoteScript(job.source, job.runtime, job.args ?? [], { useCached: job.useCached })
+        .then(({ file, args }) => execa(file, args, options))
       : await execaCommand(job.command as string, { ...options, shell: true });
     return {
       success: result.exitCode === 0 && !result.timedOut,

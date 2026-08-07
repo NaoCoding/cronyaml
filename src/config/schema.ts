@@ -6,6 +6,7 @@ export const rawJobSchema = z.object({
   source: z.string().url().optional(),
   runtime: z.enum(["bash", "sh", "node", "python", "powershell"]).optional(),
   args: z.array(z.string()).optional(),
+  "use-cached": z.boolean().optional(),
   cwd: z.string().optional(),
   env: z.record(z.string()).optional(),
   timeout: z.string().optional(),
@@ -19,6 +20,9 @@ export const rawJobSchema = z.object({
   }
   if (job.source === undefined && (job.runtime !== undefined || job.args !== undefined)) {
     context.addIssue({ code: z.ZodIssueCode.custom, message: "runtime and args require source", path: ["source"] });
+  }
+  if (job.source === undefined && job["use-cached"] !== undefined) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "use-cached requires source", path: ["use-cached"] });
   }
 });
 

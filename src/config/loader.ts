@@ -105,6 +105,7 @@ export function loadConfig(file?: string, cwd = process.cwd()): ValidatedConfig 
       source: job.source,
       runtime: job.runtime,
       args: job.args ?? [],
+      useCached: job["use-cached"] ?? false,
       cwd: jobCwd,
       env: { ...dotenvValues, ...process.env, ...job.env } as Record<string, string>,
       timeout,

@@ -16,6 +16,7 @@ export interface JobConfig {
   source?: string;
   runtime?: ScriptRuntime;
   args?: string[];
+  useCached: boolean;
   cwd?: string;
   env?: Record<string, string>;
   timeout?: string;
@@ -31,6 +32,7 @@ export interface RawJobConfig {
   source?: string;
   runtime?: ScriptRuntime;
   args?: string[];
+  "use-cached"?: boolean;
   cwd?: string;
   env?: Record<string, string>;
   timeout?: string;

@@ -36,9 +36,24 @@ describe("remote scripts", () => {
     const result = await resolveRemoteScript(source, undefined, [], {
       cacheDirectory,
       fetchImpl: async () => { throw new Error("offline"); },
+      useCached: true,
     });
 
     expect(result.args[0]).toBe(first.args[0]);
     expect(readFileSync(result.args[0] as string, "utf8")).toContain("cached");
+  });
+
+  it("does not use the cached script unless useCached is enabled", async () => {
+    const cacheDirectory = mkdtempSync(join(tmpdir(), "cronyaml-cache-"));
+    const source = "https://raw.githubusercontent.com/example/scripts/main/hello.js";
+    await resolveRemoteScript(source, undefined, [], {
+      cacheDirectory,
+      fetchImpl: async () => new Response("console.log('cached')\n", { status: 200 }),
+    });
+
+    await expect(resolveRemoteScript(source, undefined, [], {
+      cacheDirectory,
+      fetchImpl: async () => { throw new Error("offline"); },
+    })).rejects.toThrow("failed to download");
   });
 });

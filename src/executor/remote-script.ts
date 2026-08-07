@@ -71,6 +71,7 @@ export interface ResolvedRemoteScript {
 export interface RemoteScriptOptions {
   cacheDirectory?: string;
   fetchImpl?: typeof fetch;
+  useCached?: boolean;
 }
 
 export async function resolveRemoteScript(source: string, runtime: ScriptRuntime | undefined, args: string[], options: RemoteScriptOptions = {}): Promise<ResolvedRemoteScript> {
@@ -91,7 +92,7 @@ export async function resolveRemoteScript(source: string, runtime: ScriptRuntime
     mkdirSync(cacheDirectory, { recursive: true });
     writeFileSync(cachedFile, content, "utf8");
   } catch (error) {
-    if (!existsSync(cachedFile)) {
+    if (!options.useCached || !existsSync(cachedFile)) {
       throw new RemoteScriptError(`failed to download ${source}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
