@@ -1,9 +1,24 @@
 {
   "name": "cronyaml",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A lightweight YAML-based cron job scheduler for Node.js",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NaoCoding/cronyaml.git"
+  },
+  "bugs": {
+    "url": "https://github.com/NaoCoding/cronyaml/issues"
+  },
+  "homepage": "https://github.com/NaoCoding/cronyaml#readme",
+  "keywords": [
+    "cron",
+    "scheduler",
+    "yaml",
+    "nodejs",
+    "automation"
+  ],
   "engines": {
     "node": ">=20"
   },
@@ -31,7 +46,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "prepublishOnly": "npm run build && npm test"
+    "prepack": "npm run build",
+    "prepublishOnly": "npm test"
   },
   "dependencies": {
     "commander": "^12.1.0",
@@ -51,10 +67,6 @@
     "prettier": "^3.4.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
-  },
-  "allowScripts": {
-    "esbuild@0.28.1": true,
-    "esbuild@0.21.5": true
+    "vitest": "^4.1.10"
   }
 }

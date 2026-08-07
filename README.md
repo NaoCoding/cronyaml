@@ -13,6 +13,8 @@ npm package: [naocoding/cronyaml](https://www.npmjs.com/package/cronyaml)
 npm install cronyaml
 ```
 
+CronYAML is an ESM-only package and requires Node.js 20 or newer.
+
 ## Quick start
 
 ```bash
