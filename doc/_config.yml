@@ -1,0 +1,9 @@
+title: CronYAML documentation
+description: Cron jobs, defined in YAML.
+url: https://naocoding.github.io
+baseurl: /cronyaml
+theme: jekyll-theme-cayman
+
+header_pages:
+  - how-to-use.md
+  - release-notes.md
