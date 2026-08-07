@@ -5,6 +5,7 @@
 CronYAML is a lightweight Node.js scheduler for running shell commands from a simple YAML file. It keeps the scheduler in the foreground and never modifies the system crontab.
 
 Repository: [github.com/NaoCoding/cronyaml](https://github.com/NaoCoding/cronyaml)
+npm package: [naocoding/cronyaml](https://www.npmjs.com/package/cronyaml)
 
 ## Installation
 
