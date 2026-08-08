@@ -1,13 +1,21 @@
 import { z } from "zod";
 
+const rawFollowUpObjectSchema = z.object({
+  job: z.string().min(1),
+  args: z.array(z.string()).optional(),
+  env: z.record(z.string()).optional(),
+  parameters: z.record(z.string()).optional(),
+  repeat: z.union([z.number().int().min(0).max(1000), z.string().min(1)]).optional(),
+  for_each: z.string().min(1).optional(),
+}).superRefine((followUp, context) => {
+  if (followUp.repeat !== undefined && followUp.for_each !== undefined) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "repeat and for_each are mutually exclusive", path: ["repeat"] });
+  }
+});
+
 const rawFollowUpSchema = z.union([
   z.string().min(1),
-  z.object({
-    job: z.string().min(1),
-    args: z.array(z.string()).optional(),
-    env: z.record(z.string()).optional(),
-    parameters: z.record(z.string()).optional(),
-  }),
+  rawFollowUpObjectSchema,
 ]);
 
 export const rawJobSchema = z.object({

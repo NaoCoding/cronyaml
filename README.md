@@ -118,7 +118,8 @@ job finishes. A follow-up can be a job name or an object with arguments and
 parameters. `args` are appended to local commands or passed to remote scripts;
 `env` and `parameters` are passed as environment variables to the follow-up.
 Follow-up values support runtime templates such as `{{ result.stdout }}` and
-`{{ result.success }}`.
+`{{ result.success }}`. Use `repeat` when the source returns a count, or
+`for_each` when it returns a JSON array:
 
 ```yaml
 jobs:
@@ -139,6 +140,18 @@ jobs:
   notify-backup-failure:
     schedule: "* * * * *"
     command: "node scripts/notify.js"
+```
+
+For example, a form job can return a JSON array and run one email job per
+response:
+
+```yaml
+if_success:
+  job: send-email
+  for_each: "{{ result.stdout }}"
+  parameters:
+    response: "{{ item }}"
+    email: "{{ item.email }}"
 ```
 
 Treat configuration files and remote sources as executable code: CronYAML intentionally runs commands and downloaded scripts with the current user's permissions. Only use trusted YAML and GitHub sources.

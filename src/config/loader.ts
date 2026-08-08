@@ -60,6 +60,8 @@ function normalizeFollowUp(value: RawJobFollowUpConfig | undefined): JobFollowUp
     args: value.args ?? [],
     env: value.env ?? {},
     parameters: value.parameters ?? {},
+    repeat: value.repeat,
+    forEach: value.for_each,
   };
 }
 
@@ -92,19 +94,22 @@ function validateFollowUpGraph(jobs: Record<string, { if_success?: RawJobFollowU
 }
 
 function validateFollowUpTemplates(jobs: Record<string, RawJobConfig>): void {
-  const validateValue = (value: string, field: string): void => {
+  const validateValue = (value: string, field: string, allowItem = false): void => {
     for (const match of value.matchAll(FOLLOW_UP_TEMPLATE_PATTERN)) {
       const path = match[1];
-      if (!FOLLOW_UP_TEMPLATE_FIELDS.has(path)) {
+      const isItemTemplate = allowItem && (path === "item" || path.startsWith("item."));
+      if (!FOLLOW_UP_TEMPLATE_FIELDS.has(path) && path !== "index" && path !== "iteration" && !isItemTemplate) {
         throw new ConfigError(`${field}: unsupported follow-up template ${path}`);
       }
     }
   };
   const validateFollowUp = (followUp: RawJobFollowUpConfig | undefined, field: string): void => {
     if (followUp === undefined || typeof followUp === "string") return;
-    followUp.args?.forEach((value, index) => validateValue(value, `${field}.args[${index}]`));
-    for (const [key, value] of Object.entries(followUp.env ?? {})) validateValue(value, `${field}.env.${key}`);
-    for (const [key, value] of Object.entries(followUp.parameters ?? {})) validateValue(value, `${field}.parameters.${key}`);
+    if (typeof followUp.repeat === "string") validateValue(followUp.repeat, `${field}.repeat`);
+    if (followUp.for_each) validateValue(followUp.for_each, `${field}.for_each`);
+    followUp.args?.forEach((value, index) => validateValue(value, `${field}.args[${index}]`, true));
+    for (const [key, value] of Object.entries(followUp.env ?? {})) validateValue(value, `${field}.env.${key}`, true);
+    for (const [key, value] of Object.entries(followUp.parameters ?? {})) validateValue(value, `${field}.parameters.${key}`, true);
   };
   for (const [name, job] of Object.entries(jobs)) {
     validateFollowUp(job.if_success, `jobs.${name}.if_success`);

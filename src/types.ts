@@ -14,6 +14,8 @@ export interface JobFollowUpConfig {
   args: string[];
   env: Record<string, string>;
   parameters: Record<string, string>;
+  repeat?: number | string;
+  forEach?: string;
 }
 
 export interface JobConfig {
@@ -40,6 +42,8 @@ export type RawJobFollowUpConfig = string | {
   args?: string[];
   env?: Record<string, string>;
   parameters?: Record<string, string>;
+  repeat?: number | string;
+  for_each?: string;
 };
 
 export interface RawJobConfig {

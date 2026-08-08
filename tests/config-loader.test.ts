@@ -78,6 +78,7 @@ describe("configuration loader", () => {
       "    if_failed:",
       "      job: alert",
       "      args: ['--source', '{{ result.jobName }}']",
+      "      repeat: '{{ result.stdout }}'",
       "      parameters:",
       "        status: '{{ result.success }}'",
       "  deploy:",
@@ -96,6 +97,7 @@ describe("configuration loader", () => {
       args: ["--source", "{{ result.jobName }}"],
       env: {},
       parameters: { status: "{{ result.success }}" },
+      repeat: "{{ result.stdout }}",
     });
   });
 
@@ -146,5 +148,25 @@ describe("configuration loader", () => {
       "",
     ].join("\n"));
     expect(() => loadConfig(undefined, directory)).toThrow("unsupported follow-up template");
+  });
+
+  it("rejects repeat and for_each together", () => {
+    const directory = tempProject();
+    writeFileSync(join(directory, "cron.yaml"), [
+      "version: 1",
+      "jobs:",
+      "  first:",
+      "    schedule: '* * * * *'",
+      "    command: echo first",
+      "    if_success:",
+      "      job: second",
+      "      repeat: 2",
+      "      for_each: '{{ result.stdout }}'",
+      "  second:",
+      "    schedule: '* * * * *'",
+      "    command: echo second",
+      "",
+    ].join("\n"));
+    expect(() => loadConfig(undefined, directory)).toThrow("repeat and for_each are mutually exclusive");
   });
 });

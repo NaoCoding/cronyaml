@@ -5,6 +5,14 @@ import type { JobConfig, JobExecutionResult, JobFollowUpConfig, JobRuntimeState,
 import { JobExecutor } from "../executor/job-executor.js";
 import type { JobInvocation } from "../executor/command-executor.js";
 
+const MAX_FOLLOW_UP_RUNS = 1000;
+
+interface FollowUpIteration {
+  index: number;
+  iteration: number;
+  item?: unknown;
+}
+
 export class CronYamlScheduler {
   private readonly tasks = new Map<string, ScheduledTask>();
   private readonly states = new Map<string, JobRuntimeState>();
@@ -83,19 +91,60 @@ export class CronYamlScheduler {
     if (!followUp) return;
 
     const target = this.getJob(followUp.job);
-    const invocation = this.createInvocation(followUp, result);
-    info(`[${new Date().toLocaleTimeString([], { hour12: false })}] ${job.name} ${result.success ? "succeeded" : "failed"}; running ${target.name}`);
-    const followUpResult = await this.trigger(target, true, invocation);
-    if (!followUpResult.success) {
-      warn(`[${new Date().toLocaleTimeString([], { hour12: false })}] follow-up ${target.name} failed after ${job.name}`);
+    let iterations: FollowUpIteration[];
+    try {
+      iterations = this.createFollowUpIterations(followUp, result);
+    } catch (error) {
+      warn(`[${new Date().toLocaleTimeString([], { hour12: false })}] follow-up ${target.name} skipped: ${error instanceof Error ? error.message : String(error)}`);
+      return;
+    }
+
+    for (const iteration of iterations) {
+      const suffix = iterations.length > 1 ? ` (${iteration.iteration}/${iterations.length})` : "";
+      try {
+        const invocation = this.createInvocation(followUp, result, iteration);
+        info(`[${new Date().toLocaleTimeString([], { hour12: false })}] ${job.name} ${result.success ? "succeeded" : "failed"}; running ${target.name}${suffix}`);
+        const followUpResult = await this.trigger(target, true, invocation);
+        if (!followUpResult.success) {
+          warn(`[${new Date().toLocaleTimeString([], { hour12: false })}] follow-up ${target.name}${suffix} failed after ${job.name}`);
+        }
+      } catch (error) {
+        warn(`[${new Date().toLocaleTimeString([], { hour12: false })}] follow-up ${target.name}${suffix} errored: ${error instanceof Error ? error.message : String(error)}`);
+      }
     }
   }
 
-  private createInvocation(followUp: JobFollowUpConfig, result: JobExecutionResult): JobInvocation {
+  private createFollowUpIterations(followUp: JobFollowUpConfig, result: JobExecutionResult): FollowUpIteration[] {
+    if (followUp.forEach !== undefined) {
+      const value = this.interpolate(followUp.forEach, result, { index: 0, iteration: 1 });
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(value);
+      } catch {
+        throw new Error("for_each must resolve to a JSON array");
+      }
+      if (!Array.isArray(parsed)) throw new Error("for_each must resolve to a JSON array");
+      if (parsed.length > MAX_FOLLOW_UP_RUNS) throw new Error(`for_each cannot run more than ${MAX_FOLLOW_UP_RUNS} jobs`);
+      return parsed.map((item, index) => ({ item, index, iteration: index + 1 }));
+    }
+
+    let count = 1;
+    if (followUp.repeat !== undefined) {
+      const value = typeof followUp.repeat === "number"
+        ? String(followUp.repeat)
+        : this.interpolate(followUp.repeat, result, { index: 0, iteration: 1 });
+      if (!/^\d+$/.test(value.trim())) throw new Error("repeat must resolve to a non-negative integer");
+      count = Number(value.trim());
+      if (count > MAX_FOLLOW_UP_RUNS) throw new Error(`repeat cannot run more than ${MAX_FOLLOW_UP_RUNS} jobs`);
+    }
+    return Array.from({ length: count }, (_unused, index) => ({ index, iteration: index + 1 }));
+  }
+
+  private createInvocation(followUp: JobFollowUpConfig, result: JobExecutionResult, iteration: FollowUpIteration): JobInvocation {
     const interpolate = (value: string): string => value.replace(/\{\{\s*([A-Za-z][A-Za-z0-9]*(?:\.[A-Za-z][A-Za-z0-9]*)*)\s*\}\}/g, (_match, path: string) => {
-      const resolved = resolveTemplateValue(path, result);
+      const resolved = resolveTemplateValue(path, result, iteration);
       if (resolved === undefined) throw new Error(`unknown follow-up parameter: ${path}`);
-      return String(resolved);
+      return formatTemplateValue(resolved);
     });
     const env = Object.fromEntries(Object.entries(followUp.env).map(([key, value]) => [key, interpolate(value)]));
     const parameters = Object.fromEntries(Object.entries(followUp.parameters).map(([key, value]) => [key, interpolate(value)]));
@@ -104,12 +153,39 @@ export class CronYamlScheduler {
       env: { ...env, ...parameters },
     };
   }
+
+  private interpolate(value: string, result: JobExecutionResult, iteration: FollowUpIteration): string {
+    return value.replace(/\{\{\s*([A-Za-z][A-Za-z0-9]*(?:\.[A-Za-z][A-Za-z0-9]*)*)\s*\}\}/g, (_match, path: string) => {
+      const resolved = resolveTemplateValue(path, result, iteration);
+      if (resolved === undefined) throw new Error(`unknown follow-up parameter: ${path}`);
+      return formatTemplateValue(resolved);
+    });
+  }
 }
 
-function resolveTemplateValue(path: string, result: JobExecutionResult): unknown {
+function resolveTemplateValue(path: string, result: JobExecutionResult, iteration: FollowUpIteration): unknown {
   if (path === "job.name" || path === "result.jobName") return result.jobName;
+  if (path === "index") return iteration.index;
+  if (path === "iteration") return iteration.iteration;
+  if (path === "item") return iteration.item;
+  if (path.startsWith("item.")) return resolveObjectPath(iteration.item, path.slice("item.".length).split("."));
   if (!path.startsWith("result.")) return undefined;
   const resultPath = path.slice("result.".length) as keyof JobExecutionResult;
   if (!(resultPath in result)) return undefined;
   return result[resultPath] ?? "";
+}
+
+function resolveObjectPath(value: unknown, path: string[]): unknown {
+  let current = value;
+  for (const part of path) {
+    if (!current || typeof current !== "object" || !(part in current)) return undefined;
+    current = (current as Record<string, unknown>)[part];
+  }
+  return current;
+}
+
+function formatTemplateValue(value: unknown): string {
+  if (value === null) return "null";
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
 }

@@ -86,4 +86,64 @@ describe("scheduler", () => {
     await expect(scheduler.executeJob("source")).resolves.toEqual(failed);
     expect(executor.execute).toHaveBeenNthCalledWith(2, alert, { args: [], env: { FAILED_JOB: "source" } });
   });
+
+  it("runs a follow-up once for each item returned as JSON", async () => {
+    const source: JobConfig = {
+      ...job,
+      name: "form",
+      ifSuccess: {
+        job: "send-email",
+        args: ["{{ item.email }}", "{{ index }}"],
+        env: {},
+        parameters: { response: "{{ item }}", iteration: "{{ iteration }}" },
+        forEach: "{{ result.stdout }}",
+      },
+    };
+    const sendEmail: JobConfig = { ...job, name: "send-email" };
+    const formResult: JobExecutionResult = {
+      jobName: "form", success: true, startedAt: new Date(), finishedAt: new Date(), durationMs: 1,
+      attempt: 1, stdout: JSON.stringify([{ email: "a@example.com" }, { email: "b@example.com" }, { email: "c@example.com" }]), timedOut: false,
+    };
+    const emailResult: JobExecutionResult = {
+      jobName: "send-email", success: true, startedAt: new Date(), finishedAt: new Date(), durationMs: 1,
+      attempt: 1, timedOut: false,
+    };
+    const executor = {
+      execute: vi.fn(async (current: JobConfig) => current.name === "form" ? formResult : emailResult),
+    };
+    const scheduler = new CronYamlScheduler({ ...config, jobs: [source, sendEmail] }, executor as never);
+
+    await expect(scheduler.executeJob("form")).resolves.toEqual(formResult);
+    expect(executor.execute).toHaveBeenCalledTimes(4);
+    expect(executor.execute).toHaveBeenNthCalledWith(2, sendEmail, {
+      args: ["a@example.com", "0"], env: { response: '{"email":"a@example.com"}', iteration: "1" },
+    });
+    expect(executor.execute).toHaveBeenNthCalledWith(4, sendEmail, {
+      args: ["c@example.com", "2"], env: { response: '{"email":"c@example.com"}', iteration: "3" },
+    });
+  });
+
+  it("repeats a follow-up using a count returned by the source job", async () => {
+    const source: JobConfig = {
+      ...job,
+      name: "form",
+      ifSuccess: { job: "send-email", args: [], env: {}, parameters: {}, repeat: "{{ result.stdout }}" },
+    };
+    const sendEmail: JobConfig = { ...job, name: "send-email" };
+    const formResult: JobExecutionResult = {
+      jobName: "form", success: true, startedAt: new Date(), finishedAt: new Date(), durationMs: 1,
+      attempt: 1, stdout: "3", timedOut: false,
+    };
+    const emailResult: JobExecutionResult = {
+      jobName: "send-email", success: true, startedAt: new Date(), finishedAt: new Date(), durationMs: 1,
+      attempt: 1, timedOut: false,
+    };
+    const executor = {
+      execute: vi.fn(async (current: JobConfig) => current.name === "form" ? formResult : emailResult),
+    };
+    const scheduler = new CronYamlScheduler({ ...config, jobs: [source, sendEmail] }, executor as never);
+
+    await expect(scheduler.executeJob("form")).resolves.toEqual(formResult);
+    expect(executor.execute).toHaveBeenCalledTimes(4);
+  });
 });

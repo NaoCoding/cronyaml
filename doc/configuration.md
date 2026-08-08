@@ -93,6 +93,34 @@ if_success:
     SOURCE_ATTEMPT: "{{ result.attempt }}"
 ```
 
+Use `repeat` to run the target a dynamic number of times. The value may be a
+literal from `0` through `1000`, or a template resolving to a non-negative
+integer:
+
+```yaml
+if_success:
+  job: send-email
+  repeat: "{{ result.stdout }}"
+```
+
+Use `for_each` when the source job writes a JSON array to stdout. The target is
+run once per array item, sequentially. `{{ item }}` is serialized as JSON for
+objects, while `{{ item.email }}` accesses a field; `{{ index }}` is zero-based
+and `{{ iteration }}` is one-based.
+
+```yaml
+if_success:
+  job: send-email
+  for_each: "{{ result.stdout }}"
+  parameters:
+    response: "{{ item }}"
+    recipient: "{{ item.email }}"
+```
+
+`repeat` and `for_each` cannot be used together. A `for_each` value must resolve
+to a JSON array, and both modes are capped at 1000 target executions per source
+job.
+
 The target job is run immediately, even if it is disabled or has no schedule.
 `args` are appended to a local command or passed after the script path for a
 remote job. `env` and `parameters` are merged into the target job's environment
