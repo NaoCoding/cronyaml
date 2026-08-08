@@ -64,6 +64,8 @@ The repository includes three runnable examples:
   [examples/remote/hello.js](./examples/remote/hello.js).
 - [Gmail OAuth sender](./examples/gmail/README.md), including its config and
   token helper.
+- [Google Forms response poller](./examples/google-form/README.md), which
+  prints recent respondent emails as JSON for `for_each` follow-ups.
 
 The remote example can be checked and run with:
 
@@ -92,7 +94,7 @@ Use `--file` to override discovery, for example `cronyaml run --file config/jobs
 
 ## Configuration
 
-Required fields are `version: 1`, `jobs`, `schedule`, and exactly one of `command` or `source`. Jobs can also set `cwd`, `env`, `enabled`, `timezone`, `timeout`, `retry`, `concurrency`, `if_success`, and `if_failed`. Remote jobs additionally support `runtime` and `args`.
+Required fields are `version: 1`, `jobs`, `schedule`, and exactly one of `command` or `source`. Jobs can also set `cwd`, `env`, `enabled`, `timezone`, `timeout`, `retry`, `concurrency`, `args`, `if_success`, and `if_failed`. Remote jobs additionally support `runtime`.
 
 Relative `cwd` paths are resolved from the directory containing `cron.yaml`. The scheduler validates all enabled and disabled jobs before starting.
 

@@ -62,8 +62,8 @@ jobs:
 | `schedule`           | —                | Required cron expression; invalid expressions fail validation.                     |
 | `command`            | —                | Local shell command. Mutually exclusive with `source`.                             |
 | `source`             | —                | HTTPS GitHub file URL. Mutually exclusive with `command`.                          |
-| `runtime`            | inferred         | Remote runtime: `bash`, `sh`, `node`, `python`, or `powershell`.                   |
-| `args`               | `[]`             | String arguments passed after a remote script path; requires `source`.             |
+| `runtime`            | inferred         | Remote runtime: `bash`, `sh`, `node`, `python`, or `powershell`; requires `source`. |
+| `args`               | `[]`             | String arguments appended to a local command or passed after a remote script path. |
 | `use-cached`         | `false`          | Permit the last cached remote script if a fresh download fails; requires `source`. |
 | `cwd`                | config directory | Working directory. Relative paths are based on the config directory.               |
 | `env`                | —                | Job environment additions and `${NAME}` references.                                |

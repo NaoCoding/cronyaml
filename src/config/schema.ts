@@ -38,8 +38,8 @@ export const rawJobSchema = z.object({
   if ((job.command === undefined) === (job.source === undefined)) {
     context.addIssue({ code: z.ZodIssueCode.custom, message: "define exactly one of command or source", path: ["command"] });
   }
-  if (job.source === undefined && (job.runtime !== undefined || job.args !== undefined)) {
-    context.addIssue({ code: z.ZodIssueCode.custom, message: "runtime and args require source", path: ["source"] });
+  if (job.source === undefined && job.runtime !== undefined) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "runtime requires source", path: ["source"] });
   }
   if (job.source === undefined && job["use-cached"] !== undefined) {
     context.addIssue({ code: z.ZodIssueCode.custom, message: "use-cached requires source", path: ["use-cached"] });

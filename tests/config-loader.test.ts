@@ -60,6 +60,20 @@ describe("configuration loader", () => {
     expect(job?.command).toBeUndefined();
   });
 
+  it("allows arguments for local commands", () => {
+    const directory = tempProject();
+    writeFileSync(join(directory, "cron.yaml"), [
+      "version: 1",
+      "jobs:",
+      "  filter:",
+      "    schedule: '* * * * *'",
+      "    command: node script.js",
+      "    args: ['.*@example\\.com$']",
+      "",
+    ].join("\n"));
+    expect(loadConfig(undefined, directory).jobs[0]?.args).toEqual([".*@example\\.com$"]);
+  });
+
   it("requires exactly one command source", () => {
     const directory = tempProject();
     writeFileSync(join(directory, "cron.yaml"), "version: 1\njobs:\n  job:\n    schedule: '* * * * *'\n");

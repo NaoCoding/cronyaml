@@ -66,3 +66,14 @@ node dist\cli\index.js exec gmail-example --file examples/gmail/cron.yaml
 Read the [Gmail example README](https://github.com/NaoCoding/cronyaml/blob/main/examples/gmail/README.md)
 for the complete Google Cloud setup. Never commit a client secret or refresh
 token.
+
+## Google Forms response poller
+
+Files: [`examples/google-form/cron.yaml`](https://github.com/NaoCoding/cronyaml/blob/main/examples/google-form/cron.yaml),
+[`get-new-responses.js`](https://github.com/NaoCoding/cronyaml/blob/main/examples/google-form/get-new-responses.js),
+and [`README.md`](https://github.com/NaoCoding/cronyaml/blob/main/examples/google-form/README.md).
+
+The poller runs every ten seconds, uses the Google Forms API timestamp filter,
+and prints the `respondentEmail` values from the preceding ten-second window as
+a JSON array. That output can feed a follow-up job with
+`for_each: "{{ result.stdout }}"`.
