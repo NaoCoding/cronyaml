@@ -6,7 +6,10 @@ import { createServer } from "node:http";
 
 const clientId = process.env.GOOGLE_CLIENT_ID;
 const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-const scope = "https://www.googleapis.com/auth/forms.responses.readonly";
+const scope = [
+  "https://www.googleapis.com/auth/forms.body.readonly",
+  "https://www.googleapis.com/auth/forms.responses.readonly",
+].join(" ");
 
 if (!clientId || !clientSecret) {
   console.error("Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET first.");

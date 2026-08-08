@@ -1,31 +1,22 @@
 #!/usr/bin/env node
 
 /**
- * Print respondent emails from the last ten seconds as a JSON array.
+ * Print answers to the form's first question from the last ten seconds as a
+ * JSON array.
  *
  * Required environment variables:
  *   GOOGLE_FORM_ID
  *   GOOGLE_CLIENT_ID
  *   GOOGLE_CLIENT_SECRET
- *   GOOGLE_REFRESH_TOKEN (created with forms.responses.readonly scope)
+ *   GOOGLE_REFRESH_TOKEN (created with forms.body.readonly and
+ *                         forms.responses.readonly scopes)
  *
- * Optional first argument:
- *   regex_filter - only respondent emails matching this JavaScript regex are output
  */
 
 const formId = process.env.GOOGLE_FORM_ID;
 const clientId = process.env.GOOGLE_CLIENT_ID;
 const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
 const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
-const regexFilter = process.argv[2] ?? ".*";
-let emailPattern;
-
-try {
-  emailPattern = new RegExp(regexFilter);
-} catch (error) {
-  console.error(`[Google Forms] Invalid regex_filter ${JSON.stringify(regexFilter)}: ${error instanceof Error ? error.message : String(error)}`);
-  process.exit(1);
-}
 
 if (!formId || !clientId || !clientSecret || !refreshToken) {
   console.error(
@@ -50,6 +41,26 @@ async function getAccessToken() {
     throw new Error(`Google token refresh failed (${response.status}): ${JSON.stringify(payload)}`);
   }
   return payload.access_token;
+}
+
+async function getFirstQuestionId(accessToken) {
+  const response = await fetch(`https://forms.googleapis.com/v1/forms/${encodeURIComponent(formId)}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(`Google Forms API failed (${response.status}): ${JSON.stringify(payload)}`);
+  }
+
+  for (const item of Array.isArray(payload.items) ? payload.items : []) {
+    const questionId = item.questionItem?.question?.questionId;
+    if (typeof questionId === "string") return questionId;
+
+    const groupedQuestionId = item.questionGroupItem?.questions?.[0]?.questionId;
+    if (typeof groupedQuestionId === "string") return groupedQuestionId;
+  }
+
+  throw new Error("The Google Form does not contain a question.");
 }
 
 async function getRecentResponses(accessToken) {
@@ -78,15 +89,39 @@ async function getRecentResponses(accessToken) {
   return responses;
 }
 
+function getAnswer(response, questionId) {
+  const answer = response.answers?.[questionId];
+  if (!answer) return undefined;
+
+  if (Array.isArray(answer.textAnswers?.answers)) {
+    const values = answer.textAnswers.answers
+      .map((item) => item.value)
+      .filter((value) => typeof value === "string");
+    if (values.length === 1) return values[0];
+    if (values.length > 1) return values;
+  }
+
+  if (Array.isArray(answer.fileUploadAnswers?.answers)) {
+    const files = answer.fileUploadAnswers.answers
+      .map((item) => item.fileName ?? item.fileId)
+      .filter((value) => typeof value === "string");
+    if (files.length === 1) return files[0];
+    if (files.length > 1) return files;
+  }
+
+  return undefined;
+}
+
 try {
   const accessToken = await getAccessToken();
+  const firstQuestionId = await getFirstQuestionId(accessToken);
   const responses = await getRecentResponses(accessToken);
-  const emails = responses
-    .map((response) => response.respondentEmail)
-    .filter((email) => typeof email === "string" && email.length > 0 && emailPattern.test(email));
+  const answers = responses
+    .map((response) => getAnswer(response, firstQuestionId))
+    .filter((answer) => answer !== undefined);
 
   // Keep stdout machine-readable: CronYAML exposes this as result.stdout.
-  console.log(JSON.stringify(emails));
+  console.log(JSON.stringify(answers));
 } catch (error) {
   console.error(`[Google Forms] ${error instanceof Error ? error.message : String(error)}`);
   process.exitCode = 1;
