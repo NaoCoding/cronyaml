@@ -1,3 +1,6 @@
+import { mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { CronYamlScheduler } from "../src/scheduler/scheduler.js";
 import type { JobConfig, JobExecutionResult, ValidatedConfig } from "../src/types.js";
@@ -153,5 +156,30 @@ describe("scheduler", () => {
 
     await expect(scheduler.executeJob("form")).resolves.toEqual(formResult);
     expect(executor.execute).toHaveBeenCalledTimes(4);
+  });
+
+  it("passes checkpoint values to a job and persists its JSON checkpoint output", async () => {
+    const checkpointPath = join(mkdtempSync(join(tmpdir(), "cronyaml-checkpoint-")), "state.json");
+    const poller: JobConfig = {
+      ...job,
+      name: "poller",
+      checkpoint: {
+        path: checkpointPath,
+        initialize: { cursor: "2026-08-08T00:00:00.000Z" },
+        input: { SINCE: "{{ checkpoint.cursor }}" },
+        output: { cursor: "{{ result.json.checkpoint.cursor }}" },
+      },
+    };
+    const result: JobExecutionResult = {
+      jobName: "poller", success: true, startedAt: new Date(), finishedAt: new Date(), durationMs: 1,
+      attempt: 1, stdout: JSON.stringify({ items: [], checkpoint: { cursor: "2026-08-08T00:00:10.000Z" } }),
+      json: { items: [], checkpoint: { cursor: "2026-08-08T00:00:10.000Z" } }, timedOut: false,
+    };
+    const executor = { execute: vi.fn(async () => result) };
+    const scheduler = new CronYamlScheduler({ ...config, jobs: [poller] }, executor as never);
+
+    await expect(scheduler.executeJob("poller")).resolves.toEqual(result);
+    expect(executor.execute).toHaveBeenCalledWith(poller, { env: { SINCE: "2026-08-08T00:00:00.000Z" } });
+    expect(JSON.parse(readFileSync(checkpointPath, "utf8"))).toEqual({ cursor: "2026-08-08T00:00:10.000Z" });
   });
 });

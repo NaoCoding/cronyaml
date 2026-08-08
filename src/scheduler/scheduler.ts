@@ -1,3 +1,5 @@
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import cron, { type ScheduledTask } from "node-cron";
 import { JobNotFoundError } from "../errors.js";
 import { info, warn } from "../logger/logger.js";
@@ -16,11 +18,16 @@ interface FollowUpIteration {
 export class CronYamlScheduler {
   private readonly tasks = new Map<string, ScheduledTask>();
   private readonly states = new Map<string, JobRuntimeState>();
+  private readonly checkpoints = new Map<string, Record<string, unknown>>();
+  private readonly checkpointBootstrap = new Set<string>();
   private readonly active = new Set<Promise<JobExecutionResult>>();
   private stopping = false;
 
   constructor(private readonly config: ValidatedConfig, private readonly executor = new JobExecutor()) {
-    for (const job of config.jobs) this.states.set(job.name, { runningCount: 0 });
+    for (const job of config.jobs) {
+      this.states.set(job.name, { runningCount: 0 });
+      if (job.checkpoint) this.initializeCheckpoint(job);
+    }
   }
 
   start(): void {
@@ -57,6 +64,20 @@ export class CronYamlScheduler {
 
   private async trigger(job: JobConfig, manual = false, invocation?: JobInvocation): Promise<JobExecutionResult> {
     if (this.stopping && !manual) throw new Error("Scheduler is stopping");
+    if (!manual && this.checkpointBootstrap.delete(job.name)) {
+      const now = new Date();
+      info(`[${now.toLocaleTimeString([], { hour12: false })}] ${job.name} checkpoint initialized; first scheduled run skipped`);
+      return {
+        jobName: job.name,
+        success: true,
+        startedAt: now,
+        finishedAt: now,
+        durationMs: 0,
+        attempt: 0,
+        timedOut: false,
+      };
+    }
+    if (manual) this.checkpointBootstrap.delete(job.name);
     const state = this.states.get(job.name) as JobRuntimeState;
     if (!manual && job.concurrency.policy === "forbid" && state.runningCount > 0) {
       warn(`[${new Date().toLocaleTimeString([], { hour12: false })}] ${job.name} skipped: previous execution still running`);
@@ -72,11 +93,12 @@ export class CronYamlScheduler {
     }
     state.runningCount += 1;
     state.lastStartedAt = new Date();
-    const promise = this.executor.execute(job, invocation);
+    const promise = this.executor.execute(job, this.withCheckpointInput(job, invocation));
     this.active.add(promise);
     try {
       const result = await promise;
       state.lastResult = result;
+      if (result.success && !this.commitCheckpoint(job, result)) return result;
       await this.runFollowUp(job, result);
       return result;
     } finally {
@@ -162,6 +184,69 @@ export class CronYamlScheduler {
       return formatTemplateValue(resolved);
     });
   }
+
+  private initializeCheckpoint(job: JobConfig): void {
+    const checkpoint = job.checkpoint as NonNullable<JobConfig["checkpoint"]>;
+    if (existsSync(checkpoint.path)) {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(readFileSync(checkpoint.path, "utf8"));
+      } catch (error) {
+        throw new Error(`jobs.${job.name}.checkpoint.path is not valid JSON: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        throw new Error(`jobs.${job.name}.checkpoint.path must contain a JSON object`);
+      }
+      this.checkpoints.set(job.name, parsed as Record<string, unknown>);
+      return;
+    }
+
+    const initial = Object.fromEntries(Object.entries(checkpoint.initialize).map(([key, value]) => [
+      key,
+      value === "now" ? new Date().toISOString() : value,
+    ]));
+    this.checkpoints.set(job.name, initial);
+    if (Object.keys(initial).length) {
+      writeCheckpoint(checkpoint.path, initial);
+      this.checkpointBootstrap.add(job.name);
+    }
+  }
+
+  private withCheckpointInput(job: JobConfig, invocation?: JobInvocation): JobInvocation | undefined {
+    if (!job.checkpoint) return invocation;
+    const checkpoint = this.checkpoints.get(job.name) ?? {};
+    const input = Object.fromEntries(Object.entries(job.checkpoint.input).map(([key, value]) => {
+      const rendered = value.replace(/\{\{\s*([A-Za-z][A-Za-z0-9]*(?:\.[A-Za-z][A-Za-z0-9]*)*)\s*\}\}/g, (_match, path: string) => {
+        if (path !== "checkpoint" && !path.startsWith("checkpoint.")) throw new Error(`jobs.${job.name}.checkpoint.input references ${path}`);
+        const resolved = resolveObjectPath(checkpoint, path === "checkpoint" ? [] : path.slice("checkpoint.".length).split("."));
+        if (resolved === undefined) throw new Error(`jobs.${job.name}.checkpoint.input references missing ${path}`);
+        return formatTemplateValue(resolved);
+      });
+      return [key, rendered];
+    }));
+    return { ...invocation, env: { ...input, ...invocation?.env } };
+  }
+
+  private commitCheckpoint(job: JobConfig, result: JobExecutionResult): boolean {
+    if (!job.checkpoint || !Object.keys(job.checkpoint.output).length) return true;
+    const checkpoint = this.checkpoints.get(job.name) ?? {};
+    const next = { ...checkpoint };
+    try {
+      for (const [key, template] of Object.entries(job.checkpoint.output)) {
+        const match = /^\{\{\s*([A-Za-z][A-Za-z0-9]*(?:\.[A-Za-z][A-Za-z0-9]*)*)\s*\}\}$/.exec(template);
+        if (!match || !match[1].startsWith("result.")) throw new Error(`output ${key} must be a single result template`);
+        const value = resolveTemplateValue(match[1], result, { index: 0, iteration: 1 });
+        if (value === undefined || value === "") throw new Error(`output ${key} resolved to an empty value`);
+        next[key] = value;
+      }
+      writeCheckpoint(job.checkpoint.path, next);
+      this.checkpoints.set(job.name, next);
+      return true;
+    } catch (error) {
+      warn(`[${new Date().toLocaleTimeString([], { hour12: false })}] ${job.name} checkpoint was not updated: ${error instanceof Error ? error.message : String(error)}`);
+      return false;
+    }
+  }
 }
 
 function resolveTemplateValue(path: string, result: JobExecutionResult, iteration: FollowUpIteration): unknown {
@@ -171,9 +256,7 @@ function resolveTemplateValue(path: string, result: JobExecutionResult, iteratio
   if (path === "item") return iteration.item;
   if (path.startsWith("item.")) return resolveObjectPath(iteration.item, path.slice("item.".length).split("."));
   if (!path.startsWith("result.")) return undefined;
-  const resultPath = path.slice("result.".length) as keyof JobExecutionResult;
-  if (!(resultPath in result)) return undefined;
-  return result[resultPath] ?? "";
+  return resolveObjectPath(result, path.slice("result.".length).split(".")) ?? "";
 }
 
 function resolveObjectPath(value: unknown, path: string[]): unknown {
@@ -189,4 +272,11 @@ function formatTemplateValue(value: unknown): string {
   if (value === null) return "null";
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
+}
+
+function writeCheckpoint(path: string, checkpoint: Record<string, unknown>): void {
+  mkdirSync(dirname(path), { recursive: true });
+  const temporaryPath = `${path}.${process.pid}.tmp`;
+  writeFileSync(temporaryPath, `${JSON.stringify(checkpoint, null, 2)}\n`, "utf8");
+  renameSync(temporaryPath, path);
 }

@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Print answers to the form's first question from the last ten seconds as a
- * JSON array.
+ * Print new answers to the form's first question as a JSON checkpoint envelope.
  *
  * Required environment variables:
  *   GOOGLE_FORM_ID
@@ -76,13 +75,15 @@ async function getFirstQuestionId(accessToken) {
 }
 
 async function getRecentResponses(accessToken) {
-  const since = new Date(Date.now() - 10_000).toISOString();
+  const since = process.env.GOOGLE_FORM_SINCE;
+  if (!since) throw new Error("GOOGLE_FORM_SINCE is required; configure the job checkpoint first.");
+  const previousIds = parseResponseIds(process.env.GOOGLE_FORM_RESPONSE_IDS_AT_TIMESTAMP);
   const responses = [];
   let pageToken;
 
   do {
     const url = new URL(`https://forms.googleapis.com/v1/forms/${encodeURIComponent(formId)}/responses`);
-    url.searchParams.set("filter", `timestamp > ${since}`);
+    url.searchParams.set("filter", `timestamp >= ${since}`);
     url.searchParams.set("pageSize", "5000");
     if (pageToken) url.searchParams.set("pageToken", pageToken);
 
@@ -98,7 +99,61 @@ async function getRecentResponses(accessToken) {
     pageToken = typeof payload.nextPageToken === "string" ? payload.nextPageToken : undefined;
   } while (pageToken);
 
-  return responses;
+  const newResponses = responses.filter((response) => isNewResponse(response, since, previousIds));
+  const checkpoint = getCheckpoint(responses, since, previousIds);
+  return { responses: newResponses, checkpoint };
+}
+
+function parseResponseIds(value) {
+  if (!value) return new Set();
+  let parsed;
+  try {
+    parsed = JSON.parse(value);
+  } catch (error) {
+    throw new Error(`GOOGLE_FORM_RESPONSE_IDS_AT_TIMESTAMP must be a JSON array: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  if (!Array.isArray(parsed) || parsed.some((id) => typeof id !== "string")) {
+    throw new Error("GOOGLE_FORM_RESPONSE_IDS_AT_TIMESTAMP must be a JSON array of strings");
+  }
+  return new Set(parsed);
+}
+
+function responseTimestamp(response) {
+  return typeof response.createTime === "string" ? response.createTime : undefined;
+}
+
+function isNewResponse(response, since, previousIds) {
+  const timestamp = responseTimestamp(response);
+  if (!timestamp || typeof response.responseId !== "string") return false;
+  const timestampValue = Date.parse(timestamp);
+  const sinceValue = Date.parse(since);
+  if (!Number.isFinite(timestampValue) || !Number.isFinite(sinceValue)) return false;
+  return timestampValue > sinceValue || (timestampValue === sinceValue && !previousIds.has(response.responseId));
+}
+
+function getCheckpoint(responses, since, previousIds) {
+  let lastResponseTimestamp = since;
+  let lastTimestampValue = Date.parse(since);
+  let responseIdsAtTimestamp = new Set(previousIds);
+
+  for (const response of responses) {
+    const timestamp = responseTimestamp(response);
+    if (typeof timestamp !== "string" || typeof response.responseId !== "string") continue;
+    const timestampValue = Date.parse(timestamp);
+    if (!Number.isFinite(timestampValue)) continue;
+    if (timestampValue > lastTimestampValue) {
+      lastResponseTimestamp = timestamp;
+      lastTimestampValue = timestampValue;
+      responseIdsAtTimestamp = new Set([response.responseId]);
+    } else if (timestampValue === lastTimestampValue) {
+      responseIdsAtTimestamp.add(response.responseId);
+    }
+  }
+
+  return {
+    lastResponseTimestamp,
+    responseIdsAtTimestamp: [...responseIdsAtTimestamp],
+  };
 }
 
 function getAnswer(response, questionId) {
@@ -132,13 +187,13 @@ function matchesAnswer(answer) {
 try {
   const accessToken = await getAccessToken();
   const firstQuestionId = await getFirstQuestionId(accessToken);
-  const responses = await getRecentResponses(accessToken);
+  const { responses, checkpoint } = await getRecentResponses(accessToken);
   const answers = responses
     .map((response) => getAnswer(response, firstQuestionId))
     .filter((answer) => answer !== undefined && matchesAnswer(answer));
 
   // Keep stdout machine-readable: CronYAML exposes this as result.stdout.
-  console.log(JSON.stringify(answers));
+  console.log(JSON.stringify({ items: answers, checkpoint }));
 } catch (error) {
   console.error(`[Google Forms] ${error instanceof Error ? error.message : String(error)}`);
   process.exitCode = 1;

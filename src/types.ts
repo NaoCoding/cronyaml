@@ -18,6 +18,13 @@ export interface JobFollowUpConfig {
   forEach?: string;
 }
 
+export interface JobCheckpointConfig {
+  path: string;
+  initialize: Record<string, string>;
+  input: Record<string, string>;
+  output: Record<string, string>;
+}
+
 export interface JobConfig {
   name: string;
   schedule?: string;
@@ -33,6 +40,7 @@ export interface JobConfig {
   timezone?: string;
   concurrency: ConcurrencyConfig;
   retry: RetryConfig;
+  checkpoint?: JobCheckpointConfig;
   ifSuccess?: JobFollowUpConfig;
   ifFailed?: JobFollowUpConfig;
 }
@@ -60,6 +68,12 @@ export interface RawJobConfig {
   timezone?: string;
   concurrency?: Partial<ConcurrencyConfig>;
   retry?: Partial<RetryConfig>;
+  checkpoint?: {
+    path?: string;
+    initialize?: Record<string, string>;
+    input?: Record<string, string>;
+    output?: Record<string, string>;
+  };
   if_success?: RawJobFollowUpConfig;
   if_failed?: RawJobFollowUpConfig;
 }
@@ -88,6 +102,7 @@ export interface JobExecutionResult {
   signal?: string;
   stdout?: string;
   stderr?: string;
+  json?: unknown;
   timedOut: boolean;
   error?: Error;
 }

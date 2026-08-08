@@ -6,6 +6,7 @@ coverage
 !.env.example
 *.log
 .DS_Store
+.cronyaml/state/
 cron.yaml
 scripts/
 

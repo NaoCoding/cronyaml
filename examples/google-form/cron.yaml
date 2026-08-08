@@ -7,6 +7,16 @@ jobs:
     command: "node get-new-responses.js"
     # regex_filter: only matching first-question answers reach the follow-up job.
     args: [".*@example\\.com$"]
+    checkpoint:
+      initialize:
+        lastResponseTimestamp: now
+        responseIdsAtTimestamp: "[]"
+      input:
+        GOOGLE_FORM_SINCE: "{{ checkpoint.lastResponseTimestamp }}"
+        GOOGLE_FORM_RESPONSE_IDS_AT_TIMESTAMP: "{{ checkpoint.responseIdsAtTimestamp }}"
+      output:
+        lastResponseTimestamp: "{{ result.json.checkpoint.lastResponseTimestamp }}"
+        responseIdsAtTimestamp: "{{ result.json.checkpoint.responseIdsAtTimestamp }}"
     env:
       GOOGLE_FORM_ID: "${GOOGLE_FORM_ID}"
       GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID}"
@@ -17,7 +27,7 @@ jobs:
       policy: forbid
     if_success:
       job: send-form-response-email
-      for_each: "{{ result.stdout }}"
+      for_each: "{{ result.json.items }}"
       parameters:
         GMAIL_SUBJECT: "New Google Form response"
         GMAIL_BODY: "A new Google Form response has this answer: {{ item }}"

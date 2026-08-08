@@ -117,6 +117,23 @@ function validateFollowUpTemplates(jobs: Record<string, RawJobConfig>): void {
   }
 }
 
+function validateCheckpointTemplates(jobs: Record<string, RawJobConfig>): void {
+  const templatePattern = /\{\{\s*([A-Za-z][A-Za-z0-9]*(?:\.[A-Za-z][A-Za-z0-9]*)*)\s*\}\}/g;
+  const validateValue = (value: string, field: string, allowed: (path: string) => boolean): void => {
+    for (const match of value.matchAll(templatePattern)) {
+      if (!allowed(match[1])) throw new ConfigError(`${field}: unsupported checkpoint template ${match[1]}`);
+    }
+  };
+  for (const [name, job] of Object.entries(jobs)) {
+    for (const [key, value] of Object.entries(job.checkpoint?.input ?? {})) {
+      validateValue(value, `jobs.${name}.checkpoint.input.${key}`, (path) => path === "checkpoint" || path.startsWith("checkpoint."));
+    }
+    for (const [key, value] of Object.entries(job.checkpoint?.output ?? {})) {
+      validateValue(value, `jobs.${name}.checkpoint.output.${key}`, (path) => path.startsWith("result."));
+    }
+  }
+}
+
 export function getConfigPath(file?: string, cwd = process.cwd()): string {
   if (file) return resolve(cwd, file);
   const found = findConfigPath(cwd);
@@ -158,6 +175,7 @@ export function loadConfig(file?: string, cwd = process.cwd()): ValidatedConfig 
   const raw = result.data as CronYamlFile;
   validateFollowUpGraph(raw.jobs);
   validateFollowUpTemplates(raw.jobs);
+  validateCheckpointTemplates(raw.jobs);
   if (raw.defaults?.timezone) validateTimezone(raw.defaults.timezone, "defaults.timezone");
   if (raw.defaults?.timeout) parseDuration(raw.defaults.timeout, "defaults.timeout");
 
@@ -179,6 +197,14 @@ export function loadConfig(file?: string, cwd = process.cwd()): ValidatedConfig 
         throw new ConfigError(`jobs.${name}.source: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
+    const checkpoint = job.checkpoint
+      ? {
+        path: resolve(directory, job.checkpoint.path ?? `.cronyaml/state/${name}.json`),
+        initialize: job.checkpoint.initialize ?? {},
+        input: job.checkpoint.input ?? {},
+        output: job.checkpoint.output ?? {},
+      }
+      : undefined;
     return {
       name,
       schedule: job.schedule,
@@ -194,6 +220,7 @@ export function loadConfig(file?: string, cwd = process.cwd()): ValidatedConfig 
       timezone,
       concurrency: { policy: job.concurrency?.policy ?? "allow" },
       retry,
+      checkpoint,
       ifSuccess: normalizeFollowUp(job.if_success),
       ifFailed: normalizeFollowUp(job.if_failed),
     };

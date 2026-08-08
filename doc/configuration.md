@@ -32,6 +32,13 @@ jobs:
       delay: 10s
     concurrency:
       policy: forbid
+    checkpoint:
+      initialize:
+        cursor: now
+      input:
+        JOB_CURSOR: "{{ checkpoint.cursor }}"
+      output:
+        cursor: "{{ result.json.checkpoint.cursor }}"
     if_success:
       job: notify-report
       args: ["--source", "{{ result.jobName }}"]
@@ -74,6 +81,7 @@ jobs:
 | `retry.attempts`     | `1`              | Total attempts, from `1` through `100`.                                            |
 | `retry.delay`        | `0s`             | Delay between failed attempts.                                                     |
 | `concurrency.policy` | `allow`          | `allow` permits overlap; `forbid` skips a scheduled run already in progress.       |
+| `checkpoint`         | none             | Persist a small JSON cursor per job, inject values into the command environment, and update them from structured JSON stdout. |
 | `if_success`         | none             | Run another configured job after this job succeeds.                                  |
 | `if_failed`          | none             | Run another configured job after this job fails, after all retries are exhausted.    |
 
@@ -135,6 +143,21 @@ the source job completes. Supported values are `result.jobName` (also
 `result.stdout`, and `result.stderr`; missing optional result fields resolve to
 an empty string. Follow-up targets must exist, and cyclic follow-up chains are
 rejected during validation.
+
+### Checkpoints
+
+Checkpoints are optional and use a JSON file. The default path is
+`.cronyaml/state/<job-name>.json` relative to the configuration file; set
+`checkpoint.path` to override it. `initialize` is a mapping whose values are
+written when the file does not exist. The special value `now` is replaced by
+the current UTC timestamp, and the first scheduled execution is skipped.
+
+`checkpoint.input` maps environment variable names to templates such as
+`{{ checkpoint.cursor }}`. `checkpoint.output` maps state keys to a single
+`result.*` template. A job using checkpoint output should write JSON to stdout,
+for example `{ "items": [], "checkpoint": { "cursor": "..." } }`.
+Checkpoint files are written atomically after a successful command and are
+automatically created; deployments only need to preserve the state directory.
 
 ## Environment variables
 

@@ -1,10 +1,12 @@
 # Google Forms response poller
 
-This example runs every ten seconds and prints the answers to the form's first
-question from responses submitted in the preceding ten-second window as a JSON
-array. The array is available to CronYAML as `result.stdout`, so it can be
-passed to a follow-up job with `for_each: "{{ result.stdout }}"`. The included
-follow-up job sends one Gmail notification per answer.
+This example runs every ten seconds and prints new answers to the form's first
+question in a checkpoint envelope. CronYAML stores the checkpoint in
+`.cronyaml/state/google-form-new-responses.json`, skips the first scheduled run
+when that file is first created, and resumes from the saved timestamp after a
+restart. Response IDs are also saved so responses with the same timestamp are
+not lost or repeated. The included follow-up job sends one Gmail notification
+per answer.
 
 ## Setup
 
@@ -48,7 +50,7 @@ node dist\cli\index.js validate --file examples/google-form/cron.yaml
 node dist\cli\index.js run --file examples/google-form/cron.yaml
 ```
 
-The script writes only the JSON email array to stdout. Authentication and API
-errors go to stderr and make the polling job fail. The disabled email job is
-started by `if_success.for_each` and receives `GMAIL_TO`, `GMAIL_SUBJECT`, and
-`GMAIL_BODY` through follow-up parameters.
+The script writes a JSON object with `items` and `checkpoint` to stdout.
+Authentication and API errors go to stderr and make the polling job fail. The
+disabled email job is started by `if_success.for_each` and receives `GMAIL_TO`,
+`GMAIL_SUBJECT`, and `GMAIL_BODY` through follow-up parameters.

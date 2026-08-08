@@ -10,6 +10,14 @@ export class JobExecutor {
       info(`[${timestamp()}] ${job.name} attempt ${attempt}/${job.retry.attempts} started`);
       const commandResult = await executeCommand(job, invocation);
       const finishedAt = new Date();
+      let json: unknown;
+      if (commandResult.stdout.trim()) {
+        try {
+          json = JSON.parse(commandResult.stdout);
+        } catch {
+          // Plain-text stdout remains valid; JSON is available only when parsing succeeds.
+        }
+      }
       lastResult = {
         jobName: job.name,
         success: commandResult.success,
@@ -21,6 +29,7 @@ export class JobExecutor {
         signal: commandResult.signal,
         stdout: commandResult.stdout,
         stderr: commandResult.stderr,
+        ...(json === undefined ? {} : { json }),
         timedOut: commandResult.timedOut,
         error: commandResult.error,
       };

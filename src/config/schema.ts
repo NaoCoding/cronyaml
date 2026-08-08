@@ -18,6 +18,13 @@ const rawFollowUpSchema = z.union([
   rawFollowUpObjectSchema,
 ]);
 
+const rawCheckpointSchema = z.object({
+  path: z.string().min(1).optional(),
+  initialize: z.record(z.string()).optional(),
+  input: z.record(z.string()).optional(),
+  output: z.record(z.string()).optional(),
+});
+
 export const rawJobSchema = z.object({
   schedule: z.string().min(1).optional(),
   command: z.string().min(1).optional(),
@@ -32,6 +39,7 @@ export const rawJobSchema = z.object({
   timezone: z.string().optional(),
   concurrency: z.object({ policy: z.enum(["allow", "forbid"]) }).optional(),
   retry: z.object({ attempts: z.number().int().min(1).max(100), delay: z.string().optional() }).optional(),
+  checkpoint: rawCheckpointSchema.optional(),
   if_success: rawFollowUpSchema.optional(),
   if_failed: rawFollowUpSchema.optional(),
 }).superRefine((job, context) => {

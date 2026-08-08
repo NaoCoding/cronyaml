@@ -127,6 +127,32 @@ describe("configuration loader", () => {
     });
   });
 
+  it("loads checkpoint configuration relative to the config directory", () => {
+    const directory = tempProject();
+    writeFileSync(join(directory, "cron.yaml"), [
+      "version: 1",
+      "jobs:",
+      "  poller:",
+      "    schedule: '* * * * *'",
+      "    command: echo poller",
+      "    checkpoint:",
+      "      initialize:",
+      "        cursor: now",
+      "      input:",
+      "        SINCE: '{{ checkpoint.cursor }}'",
+      "      output:",
+      "        cursor: '{{ result.json.checkpoint.cursor }}'",
+      "",
+    ].join("\n"));
+
+    expect(loadConfig(undefined, directory).jobs[0]?.checkpoint).toEqual({
+      path: join(directory, ".cronyaml", "state", "poller.json"),
+      initialize: { cursor: "now" },
+      input: { SINCE: "{{ checkpoint.cursor }}" },
+      output: { cursor: "{{ result.json.checkpoint.cursor }}" },
+    });
+  });
+
   it("rejects missing and cyclic follow-up jobs", () => {
     const directory = tempProject();
     writeFileSync(join(directory, "cron.yaml"), [
