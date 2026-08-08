@@ -37,6 +37,8 @@ GMAIL_TO=notification-recipient@example.com
 The Gmail refresh token must have the `gmail.send` scope. Text, choice, scale,
 date, and time answers are returned as strings. Checkbox questions and file
 upload questions may return an array when multiple values/files were submitted.
+Set the `regex_filter` argument in [`cron.yaml`](./cron.yaml) to control which
+first-question answers are passed to the follow-up job.
 
 ## Run
 

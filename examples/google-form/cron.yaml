@@ -5,6 +5,8 @@ jobs:
     # CronYAML/node-cron accepts a seconds field: every 10 seconds.
     schedule: "*/10 * * * * *"
     command: "node get-new-responses.js"
+    # regex_filter: only matching first-question answers reach the follow-up job.
+    args: [".*@example\\.com$"]
     env:
       GOOGLE_FORM_ID: "${GOOGLE_FORM_ID}"
       GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID}"

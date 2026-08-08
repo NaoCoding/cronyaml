@@ -11,12 +11,24 @@
  *   GOOGLE_REFRESH_TOKEN (created with forms.body.readonly and
  *                         forms.responses.readonly scopes)
  *
+ * Optional first argument:
+ *   regex_filter - only first-question answers matching this JavaScript regex
+ *                  are output
  */
 
 const formId = process.env.GOOGLE_FORM_ID;
 const clientId = process.env.GOOGLE_CLIENT_ID;
 const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
 const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+const regexFilter = process.argv[2] ?? ".*";
+let answerPattern;
+
+try {
+  answerPattern = new RegExp(regexFilter);
+} catch (error) {
+  console.error(`[Google Forms] Invalid regex_filter ${JSON.stringify(regexFilter)}: ${error instanceof Error ? error.message : String(error)}`);
+  process.exit(1);
+}
 
 if (!formId || !clientId || !clientSecret || !refreshToken) {
   console.error(
@@ -112,13 +124,18 @@ function getAnswer(response, questionId) {
   return undefined;
 }
 
+function matchesAnswer(answer) {
+  if (typeof answer === "string") return answerPattern.test(answer);
+  return Array.isArray(answer) && answer.some((value) => typeof value === "string" && answerPattern.test(value));
+}
+
 try {
   const accessToken = await getAccessToken();
   const firstQuestionId = await getFirstQuestionId(accessToken);
   const responses = await getRecentResponses(accessToken);
   const answers = responses
     .map((response) => getAnswer(response, firstQuestionId))
-    .filter((answer) => answer !== undefined);
+    .filter((answer) => answer !== undefined && matchesAnswer(answer));
 
   // Keep stdout machine-readable: CronYAML exposes this as result.stdout.
   console.log(JSON.stringify(answers));
