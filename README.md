@@ -55,21 +55,30 @@ jobs:
 
 CronYAML downloads the script when the job runs. Remote jobs always download a fresh copy by default; set `use-cached: true` to allow fallback to a previous cached copy when downloading fails. Supported runtimes are `bash`, `sh`, `node`, `python`, and `powershell`. Prefer a URL pinned to a commit SHA for predictable execution, for example `https://raw.githubusercontent.com/my-org/scripts/<commit>/backup.sh`.
 
-## Remote script example
+## Examples
 
-The repository includes [example.yaml](./example.yaml), which runs the example script from GitHub:
+The repository includes three runnable examples:
+
+- [Basic local command](./examples/basic/cron.yaml) and its heartbeat script.
+- [Remote GitHub script](./example.yaml), which uses
+  [examples/remote/hello.js](./examples/remote/hello.js).
+- [Gmail OAuth sender](./examples/gmail/README.md), including its config and
+  token helper.
+
+The remote example can be checked and run with:
 
 ```bash
 npx cronyaml validate --file example.yaml
-npx cronyaml exec remote-example --file example.yaml
+npx cronyaml exec hello_remote --file example.yaml
 npx cronyaml run --file example.yaml
 ```
 
 ## CLI
 
-For the maintained command reference and configuration guide, see the
-[how-to-use documentation](./doc/how-to-use.md). Release history is maintained
-in the [release notes](./doc/release-notes.md).
+For the maintained guides, see the [documentation site source](./doc/index.md),
+including the [examples guide](./doc/examples.md), [CLI reference](./doc/cli.md),
+and [configuration reference](./doc/configuration.md). Release history is
+maintained in the [release notes](./doc/release-notes.md).
 
 ```text
 cronyaml init [--force] [--file <path>]

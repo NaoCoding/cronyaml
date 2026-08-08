@@ -5,5 +5,11 @@ baseurl: /cronyaml
 theme: jekyll-theme-cayman
 
 header_pages:
+  - getting-started.md
   - how-to-use.md
+  - configuration.md
+  - cli.md
+  - examples.md
+  - api.md
+  - operations.md
   - release-notes.md

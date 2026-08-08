@@ -1,0 +1,18 @@
+version: 1
+
+jobs:
+  gmail-example:
+    # Put a populated .env next to this file before running it.
+    schedule: "0 9 * * 1-5"
+    source: "https://github.com/NaoCoding/cronyaml/blob/main/examples/gmail/send-email.js"
+    runtime: node
+    env:
+      GMAIL_CLIENT_ID: "${GMAIL_CLIENT_ID}"
+      GMAIL_CLIENT_SECRET: "${GMAIL_CLIENT_SECRET}"
+      GMAIL_REFRESH_TOKEN: "${GMAIL_REFRESH_TOKEN}"
+      GMAIL_TO: "${GMAIL_TO}"
+      GMAIL_SUBJECT: "${GMAIL_SUBJECT}"
+      GMAIL_BODY: "${GMAIL_BODY}"
+    timeout: "30s"
+    concurrency:
+      policy: forbid

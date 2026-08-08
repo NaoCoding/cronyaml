@@ -7,3 +7,8 @@ coverage
 *.log
 .DS_Store
 cron.yaml
+
+# Keep repository examples visible even though local cron.yaml files are ignored.
+!examples/
+!examples/**/
+!examples/**/cron.yaml

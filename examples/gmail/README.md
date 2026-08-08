@@ -1,5 +1,9 @@
 # Gmail example
 
+This directory contains a complete remote-script configuration. The job
+definition is in [`cron.yaml`](./cron.yaml), and the sender is in
+[`send-email.js`](./send-email.js).
+
 `send-email.js` refreshes a Gmail OAuth access token before each send, then
 sends a plain-text message through the Gmail API. It uses Node.js 20's built-in
 `fetch`, so no additional package is required.
@@ -24,13 +28,32 @@ copy the printed `GMAIL_REFRESH_TOKEN` into `.env`. The helper uses
 
 ## Run the sender
 
-Copy `.env.example` to `.env` and replace the Gmail placeholders, then run:
+Copy the repository template next to this configuration and replace the Gmail
+placeholders. CronYAML loads `.env` from the configuration directory:
 
 ```powershell
-node dist\cli\index.js validate --file cron.yaml
-node dist\cli\index.js exec gmail-example --file cron.yaml
+Copy-Item .env.example examples/gmail/.env
+# Edit examples/gmail/.env before continuing.
+```
+
+Then run from the repository root:
+
+```powershell
+npm run build
+node dist\cli\index.js validate --file examples/gmail/cron.yaml
+node dist\cli\index.js exec gmail-example --file examples/gmail/cron.yaml
+```
+
+The same job can be scheduled with:
+
+```powershell
+node dist\cli\index.js run --file examples/gmail/cron.yaml
 ```
 
 The Gmail account that authorized the refresh token is used as the sender.
 Never commit the client secret or refresh token. If either is exposed, revoke
 the credential from your Google Account security settings.
+
+See the [examples guide](../../doc/examples.md) for the other bundled examples
+and the [configuration reference](../../doc/configuration.md) for the fields
+used by this job.
