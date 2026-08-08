@@ -1,14 +1,14 @@
 import { failure, info, jobOutput, timestamp, warn } from "../logger/logger.js";
 import type { JobConfig, JobExecutionResult } from "../types.js";
-import { executeCommand } from "./command-executor.js";
+import { executeCommand, type JobInvocation } from "./command-executor.js";
 
 export class JobExecutor {
-  async execute(job: JobConfig): Promise<JobExecutionResult> {
+  async execute(job: JobConfig, invocation?: JobInvocation): Promise<JobExecutionResult> {
     let lastResult: JobExecutionResult | undefined;
     for (let attempt = 1; attempt <= job.retry.attempts; attempt += 1) {
       const startedAt = new Date();
       info(`[${timestamp()}] ${job.name} attempt ${attempt}/${job.retry.attempts} started`);
-      const commandResult = await executeCommand(job);
+      const commandResult = await executeCommand(job, invocation);
       const finishedAt = new Date();
       lastResult = {
         jobName: job.name,

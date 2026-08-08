@@ -3,6 +3,11 @@ import type { JobConfig } from "../types.js";
 import { parseDuration } from "../utils/duration.js";
 import { resolveRemoteScript } from "./remote-script.js";
 
+export interface JobInvocation {
+  args?: string[];
+  env?: Record<string, string>;
+}
+
 export interface CommandResult {
   success: boolean;
   exitCode?: number;
@@ -13,18 +18,19 @@ export interface CommandResult {
   error?: Error;
 }
 
-export async function executeCommand(job: JobConfig): Promise<CommandResult> {
+export async function executeCommand(job: JobConfig, invocation: JobInvocation = {}): Promise<CommandResult> {
   try {
     const options = {
       cwd: job.cwd,
-      env: job.env,
+      env: { ...job.env, ...invocation.env },
       reject: false,
       timeout: job.timeout ? parseDuration(job.timeout, `${job.name}.timeout`) : undefined,
     };
+    const args = [...(job.args ?? []), ...(invocation.args ?? [])];
     const result = job.source
-      ? await resolveRemoteScript(job.source, job.runtime, job.args ?? [], { useCached: job.useCached })
+      ? await resolveRemoteScript(job.source, job.runtime, args, { useCached: job.useCached })
         .then(({ file, args }) => execa(file, args, options))
-      : await execaCommand(job.command as string, { ...options, shell: true });
+      : await execaCommand(appendCommandArgs(job.command as string, args), { ...options, shell: true });
     return {
       success: result.exitCode === 0 && !result.timedOut,
       exitCode: result.exitCode,
@@ -45,4 +51,9 @@ export async function executeCommand(job: JobConfig): Promise<CommandResult> {
       error: typed,
     };
   }
+}
+
+function appendCommandArgs(command: string, args: string[]): string {
+  if (!args.length) return command;
+  return `${command} ${args.map((arg) => JSON.stringify(arg)).join(" ")}`;
 }

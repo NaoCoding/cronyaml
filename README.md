@@ -92,7 +92,7 @@ Use `--file` to override discovery, for example `cronyaml run --file config/jobs
 
 ## Configuration
 
-Required fields are `version: 1`, `jobs`, `schedule`, and exactly one of `command` or `source`. Jobs can also set `cwd`, `env`, `enabled`, `timezone`, `timeout`, `retry`, and `concurrency`. Remote jobs additionally support `runtime` and `args`.
+Required fields are `version: 1`, `jobs`, `schedule`, and exactly one of `command` or `source`. Jobs can also set `cwd`, `env`, `enabled`, `timezone`, `timeout`, `retry`, `concurrency`, `if_success`, and `if_failed`. Remote jobs additionally support `runtime` and `args`.
 
 Relative `cwd` paths are resolved from the directory containing `cron.yaml`. The scheduler validates all enabled and disabled jobs before starting.
 
@@ -111,6 +111,34 @@ jobs:
     command: "node scripts/report.js --url ${REPORT_URL}"
     env:
       NODE_ENV: production
+```
+
+Use `if_success` or `if_failed` to run another configured job after the current
+job finishes. A follow-up can be a job name or an object with arguments and
+parameters. `args` are appended to local commands or passed to remote scripts;
+`env` and `parameters` are passed as environment variables to the follow-up.
+Follow-up values support runtime templates such as `{{ result.stdout }}` and
+`{{ result.success }}`.
+
+```yaml
+jobs:
+  backup:
+    schedule: "0 2 * * *"
+    command: "npm run backup"
+    if_success:
+      job: report-backup
+      args: ["--source", "{{ result.jobName }}"]
+      parameters:
+        backup_status: "{{ result.success }}"
+    if_failed: notify-backup-failure
+
+  report-backup:
+    schedule: "* * * * *"
+    command: "node scripts/report.js"
+
+  notify-backup-failure:
+    schedule: "* * * * *"
+    command: "node scripts/notify.js"
 ```
 
 Treat configuration files and remote sources as executable code: CronYAML intentionally runs commands and downloaded scripts with the current user's permissions. Only use trusted YAML and GitHub sources.

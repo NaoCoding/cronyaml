@@ -7,11 +7,25 @@ import { ConfigError } from "../errors.js";
 import { parseDuration } from "../utils/duration.js";
 import { DEFAULT_CONFIG_FILENAMES, findConfigPath } from "../utils/paths.js";
 import { rawConfigSchema } from "./schema.js";
-import type { CronYamlFile, JobConfig, ValidatedConfig } from "../types.js";
+import type { CronYamlFile, JobConfig, JobFollowUpConfig, RawJobConfig, RawJobFollowUpConfig, ValidatedConfig } from "../types.js";
 import { normalizeGitHubSource } from "../executor/remote-script.js";
 
 const NAME_PATTERN = /^[A-Za-z0-9._-]+$/;
 const ENV_PATTERN = /\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g;
+const FOLLOW_UP_TEMPLATE_PATTERN = /\{\{\s*([A-Za-z][A-Za-z0-9]*(?:\.[A-Za-z][A-Za-z0-9]*)*)\s*\}\}/g;
+const FOLLOW_UP_TEMPLATE_FIELDS = new Set([
+  "job.name",
+  "result.jobName",
+  "result.success",
+  "result.startedAt",
+  "result.finishedAt",
+  "result.durationMs",
+  "result.attempt",
+  "result.exitCode",
+  "result.signal",
+  "result.stdout",
+  "result.stderr",
+]);
 
 function interpolate(value: string, environment: Record<string, string>, field: string): string {
   return value.replace(ENV_PATTERN, (_match, name: string) => {
@@ -35,6 +49,66 @@ function validateTimezone(timezone: string, field: string): void {
     new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format();
   } catch {
     throw new ConfigError(`${field}: invalid timezone ${JSON.stringify(timezone)}`);
+  }
+}
+
+function normalizeFollowUp(value: RawJobFollowUpConfig | undefined): JobFollowUpConfig | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value === "string") return { job: value, args: [], env: {}, parameters: {} };
+  return {
+    job: value.job,
+    args: value.args ?? [],
+    env: value.env ?? {},
+    parameters: value.parameters ?? {},
+  };
+}
+
+function validateFollowUpGraph(jobs: Record<string, { if_success?: RawJobFollowUpConfig; if_failed?: RawJobFollowUpConfig }>): void {
+  const edges = new Map<string, string[]>();
+  for (const [name, job] of Object.entries(jobs)) {
+    const targets = [job.if_success, job.if_failed]
+      .map((followUp) => typeof followUp === "string" ? followUp : followUp?.job)
+      .filter((target): target is string => target !== undefined);
+    for (const target of targets) {
+      if (!Object.prototype.hasOwnProperty.call(jobs, target)) {
+        throw new ConfigError(`jobs.${name}: follow-up job does not exist: ${target}`);
+      }
+      if (target === name) throw new ConfigError(`jobs.${name}: follow-up job cannot reference itself`);
+    }
+    edges.set(name, targets);
+  }
+
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const visit = (name: string): void => {
+    if (visiting.has(name)) throw new ConfigError(`job follow-up cycle detected at: ${name}`);
+    if (visited.has(name)) return;
+    visiting.add(name);
+    for (const target of edges.get(name) ?? []) visit(target);
+    visiting.delete(name);
+    visited.add(name);
+  };
+  for (const name of edges.keys()) visit(name);
+}
+
+function validateFollowUpTemplates(jobs: Record<string, RawJobConfig>): void {
+  const validateValue = (value: string, field: string): void => {
+    for (const match of value.matchAll(FOLLOW_UP_TEMPLATE_PATTERN)) {
+      const path = match[1];
+      if (!FOLLOW_UP_TEMPLATE_FIELDS.has(path)) {
+        throw new ConfigError(`${field}: unsupported follow-up template ${path}`);
+      }
+    }
+  };
+  const validateFollowUp = (followUp: RawJobFollowUpConfig | undefined, field: string): void => {
+    if (followUp === undefined || typeof followUp === "string") return;
+    followUp.args?.forEach((value, index) => validateValue(value, `${field}.args[${index}]`));
+    for (const [key, value] of Object.entries(followUp.env ?? {})) validateValue(value, `${field}.env.${key}`);
+    for (const [key, value] of Object.entries(followUp.parameters ?? {})) validateValue(value, `${field}.parameters.${key}`);
+  };
+  for (const [name, job] of Object.entries(jobs)) {
+    validateFollowUp(job.if_success, `jobs.${name}.if_success`);
+    validateFollowUp(job.if_failed, `jobs.${name}.if_failed`);
   }
 }
 
@@ -77,6 +151,8 @@ export function loadConfig(file?: string, cwd = process.cwd()): ValidatedConfig 
   }
 
   const raw = result.data as CronYamlFile;
+  validateFollowUpGraph(raw.jobs);
+  validateFollowUpTemplates(raw.jobs);
   if (raw.defaults?.timezone) validateTimezone(raw.defaults.timezone, "defaults.timezone");
   if (raw.defaults?.timeout) parseDuration(raw.defaults.timeout, "defaults.timeout");
 
@@ -113,6 +189,8 @@ export function loadConfig(file?: string, cwd = process.cwd()): ValidatedConfig 
       timezone,
       concurrency: { policy: job.concurrency?.policy ?? "allow" },
       retry,
+      ifSuccess: normalizeFollowUp(job.if_success),
+      ifFailed: normalizeFollowUp(job.if_failed),
     };
   });
   return { path, directory, defaults: raw.defaults ?? {}, jobs };

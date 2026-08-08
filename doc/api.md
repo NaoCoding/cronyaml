@@ -38,13 +38,16 @@ the file. Configuration failures throw `ConfigError`.
 
 `executeJob` resolves to a `JobExecutionResult` containing success, timing,
 attempt, exit code or signal, captured output, timeout state, and any error.
+When the job has an `if_success` or `if_failed` follow-up, the follow-up is
+executed before `executeJob` resolves, while the returned result remains the
+result of the originally requested job.
 
 ## Errors and types
 
 The package also exports `CronYamlError`, `ConfigError`, and
 `JobNotFoundError`, plus the types `JobConfig`, `ValidatedConfig`,
 `JobExecutionResult`, `JobRuntimeState`, `RetryConfig`, and related public
-interfaces.
+interfaces. `JobFollowUpConfig` describes normalized conditional follow-ups.
 
 The scheduler does not daemonize itself. Keep the Node.js process alive and let
 your service manager, container runtime, or parent process manage restarts.

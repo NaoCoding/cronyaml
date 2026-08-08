@@ -1,8 +1,9 @@
 import cron, { type ScheduledTask } from "node-cron";
 import { JobNotFoundError } from "../errors.js";
 import { info, warn } from "../logger/logger.js";
-import type { JobConfig, JobExecutionResult, JobRuntimeState, ValidatedConfig } from "../types.js";
+import type { JobConfig, JobExecutionResult, JobFollowUpConfig, JobRuntimeState, ValidatedConfig } from "../types.js";
 import { JobExecutor } from "../executor/job-executor.js";
+import type { JobInvocation } from "../executor/command-executor.js";
 
 export class CronYamlScheduler {
   private readonly tasks = new Map<string, ScheduledTask>();
@@ -45,7 +46,7 @@ export class CronYamlScheduler {
     return job;
   }
 
-  private async trigger(job: JobConfig, manual = false): Promise<JobExecutionResult> {
+  private async trigger(job: JobConfig, manual = false, invocation?: JobInvocation): Promise<JobExecutionResult> {
     if (this.stopping && !manual) throw new Error("Scheduler is stopping");
     const state = this.states.get(job.name) as JobRuntimeState;
     if (!manual && job.concurrency.policy === "forbid" && state.runningCount > 0) {
@@ -62,11 +63,12 @@ export class CronYamlScheduler {
     }
     state.runningCount += 1;
     state.lastStartedAt = new Date();
-    const promise = this.executor.execute(job);
+    const promise = this.executor.execute(job, invocation);
     this.active.add(promise);
     try {
       const result = await promise;
       state.lastResult = result;
+      await this.runFollowUp(job, result);
       return result;
     } finally {
       state.runningCount -= 1;
@@ -74,4 +76,40 @@ export class CronYamlScheduler {
       this.active.delete(promise);
     }
   }
+
+  private async runFollowUp(job: JobConfig, result: JobExecutionResult): Promise<void> {
+    if (result.attempt === 0) return;
+    const followUp = result.success ? job.ifSuccess : job.ifFailed;
+    if (!followUp) return;
+
+    const target = this.getJob(followUp.job);
+    const invocation = this.createInvocation(followUp, result);
+    info(`[${new Date().toLocaleTimeString([], { hour12: false })}] ${job.name} ${result.success ? "succeeded" : "failed"}; running ${target.name}`);
+    const followUpResult = await this.trigger(target, true, invocation);
+    if (!followUpResult.success) {
+      warn(`[${new Date().toLocaleTimeString([], { hour12: false })}] follow-up ${target.name} failed after ${job.name}`);
+    }
+  }
+
+  private createInvocation(followUp: JobFollowUpConfig, result: JobExecutionResult): JobInvocation {
+    const interpolate = (value: string): string => value.replace(/\{\{\s*([A-Za-z][A-Za-z0-9]*(?:\.[A-Za-z][A-Za-z0-9]*)*)\s*\}\}/g, (_match, path: string) => {
+      const resolved = resolveTemplateValue(path, result);
+      if (resolved === undefined) throw new Error(`unknown follow-up parameter: ${path}`);
+      return String(resolved);
+    });
+    const env = Object.fromEntries(Object.entries(followUp.env).map(([key, value]) => [key, interpolate(value)]));
+    const parameters = Object.fromEntries(Object.entries(followUp.parameters).map(([key, value]) => [key, interpolate(value)]));
+    return {
+      args: followUp.args.map(interpolate),
+      env: { ...env, ...parameters },
+    };
+  }
+}
+
+function resolveTemplateValue(path: string, result: JobExecutionResult): unknown {
+  if (path === "job.name" || path === "result.jobName") return result.jobName;
+  if (!path.startsWith("result.")) return undefined;
+  const resultPath = path.slice("result.".length) as keyof JobExecutionResult;
+  if (!(resultPath in result)) return undefined;
+  return result[resultPath] ?? "";
 }

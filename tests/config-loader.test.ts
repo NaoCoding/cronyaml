@@ -65,4 +65,86 @@ describe("configuration loader", () => {
     writeFileSync(join(directory, "cron.yaml"), "version: 1\njobs:\n  job:\n    schedule: '* * * * *'\n");
     expect(() => loadConfig(undefined, directory)).toThrow(ConfigError);
   });
+
+  it("loads success and failure follow-ups with runtime parameters", () => {
+    const directory = tempProject();
+    writeFileSync(join(directory, "cron.yaml"), [
+      "version: 1",
+      "jobs:",
+      "  build:",
+      "    schedule: '* * * * *'",
+      "    command: echo build",
+      "    if_success: deploy",
+      "    if_failed:",
+      "      job: alert",
+      "      args: ['--source', '{{ result.jobName }}']",
+      "      parameters:",
+      "        status: '{{ result.success }}'",
+      "  deploy:",
+      "    schedule: '* * * * *'",
+      "    command: echo deploy",
+      "  alert:",
+      "    schedule: '* * * * *'",
+      "    command: echo alert",
+      "",
+    ].join("\n"));
+
+    const jobs = loadConfig(undefined, directory).jobs;
+    expect(jobs.find((job) => job.name === "build")?.ifSuccess).toEqual({ job: "deploy", args: [], env: {}, parameters: {} });
+    expect(jobs.find((job) => job.name === "build")?.ifFailed).toEqual({
+      job: "alert",
+      args: ["--source", "{{ result.jobName }}"],
+      env: {},
+      parameters: { status: "{{ result.success }}" },
+    });
+  });
+
+  it("rejects missing and cyclic follow-up jobs", () => {
+    const directory = tempProject();
+    writeFileSync(join(directory, "cron.yaml"), [
+      "version: 1",
+      "jobs:",
+      "  first:",
+      "    schedule: '* * * * *'",
+      "    command: echo first",
+      "    if_success: missing",
+      "",
+    ].join("\n"));
+    expect(() => loadConfig(undefined, directory)).toThrow("follow-up job does not exist");
+
+    writeFileSync(join(directory, "cron.yaml"), [
+      "version: 1",
+      "jobs:",
+      "  first:",
+      "    schedule: '* * * * *'",
+      "    command: echo first",
+      "    if_success: second",
+      "  second:",
+      "    schedule: '* * * * *'",
+      "    command: echo second",
+      "    if_failed: first",
+      "",
+    ].join("\n"));
+    expect(() => loadConfig(undefined, directory)).toThrow("follow-up cycle detected");
+  });
+
+  it("rejects unsupported follow-up templates during validation", () => {
+    const directory = tempProject();
+    writeFileSync(join(directory, "cron.yaml"), [
+      "version: 1",
+      "jobs:",
+      "  first:",
+      "    schedule: '* * * * *'",
+      "    command: echo first",
+      "    if_success:",
+      "      job: second",
+      "      parameters:",
+      "        value: '{{ result.unknown }}'",
+      "  second:",
+      "    schedule: '* * * * *'",
+      "    command: echo second",
+      "",
+    ].join("\n"));
+    expect(() => loadConfig(undefined, directory)).toThrow("unsupported follow-up template");
+  });
 });

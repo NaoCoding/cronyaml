@@ -31,6 +31,12 @@ jobs:
       delay: 10s
     concurrency:
       policy: forbid
+    if_success:
+      job: notify-report
+      args: ["--source", "{{ result.jobName }}"]
+      parameters:
+        status: "{{ result.success }}"
+    if_failed: notify-report
 
   remote-report:
     schedule: "*/15 * * * *"
@@ -67,9 +73,36 @@ jobs:
 | `retry.attempts`     | `1`              | Total attempts, from `1` through `100`.                                            |
 | `retry.delay`        | `0s`             | Delay between failed attempts.                                                     |
 | `concurrency.policy` | `allow`          | `allow` permits overlap; `forbid` skips a scheduled run already in progress.       |
+| `if_success`         | none             | Run another configured job after this job succeeds.                                  |
+| `if_failed`          | none             | Run another configured job after this job fails, after all retries are exhausted.    |
 
 Job names may contain letters, numbers, `.`, `_`, and `-`, and may be up to 100
 characters long.
+
+## Conditional follow-ups
+
+`if_success` and `if_failed` accept either a target job name or an object:
+
+```yaml
+if_success:
+  job: deploy
+  args: ["--release", "{{ result.jobName }}"]
+  env:
+    SOURCE_STATUS: "{{ result.success }}"
+  parameters:
+    SOURCE_ATTEMPT: "{{ result.attempt }}"
+```
+
+The target job is run immediately, even if it is disabled or has no schedule.
+`args` are appended to a local command or passed after the script path for a
+remote job. `env` and `parameters` are merged into the target job's environment
+(`parameters` take precedence when keys overlap). Templates are resolved after
+the source job completes. Supported values are `result.jobName` (also
+`job.name`), `result.success`, `result.startedAt`, `result.finishedAt`,
+`result.durationMs`, `result.attempt`, `result.exitCode`, `result.signal`,
+`result.stdout`, and `result.stderr`; missing optional result fields resolve to
+an empty string. Follow-up targets must exist, and cyclic follow-up chains are
+rejected during validation.
 
 ## Environment variables
 

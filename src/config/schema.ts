@@ -1,5 +1,15 @@
 import { z } from "zod";
 
+const rawFollowUpSchema = z.union([
+  z.string().min(1),
+  z.object({
+    job: z.string().min(1),
+    args: z.array(z.string()).optional(),
+    env: z.record(z.string()).optional(),
+    parameters: z.record(z.string()).optional(),
+  }),
+]);
+
 export const rawJobSchema = z.object({
   schedule: z.string().min(1),
   command: z.string().min(1).optional(),
@@ -14,6 +24,8 @@ export const rawJobSchema = z.object({
   timezone: z.string().optional(),
   concurrency: z.object({ policy: z.enum(["allow", "forbid"]) }).optional(),
   retry: z.object({ attempts: z.number().int().min(1).max(100), delay: z.string().optional() }).optional(),
+  if_success: rawFollowUpSchema.optional(),
+  if_failed: rawFollowUpSchema.optional(),
 }).superRefine((job, context) => {
   if ((job.command === undefined) === (job.source === undefined)) {
     context.addIssue({ code: z.ZodIssueCode.custom, message: "define exactly one of command or source", path: ["command"] });

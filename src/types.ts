@@ -9,6 +9,13 @@ export interface ConcurrencyConfig {
 
 export type ScriptRuntime = "bash" | "sh" | "node" | "python" | "powershell";
 
+export interface JobFollowUpConfig {
+  job: string;
+  args: string[];
+  env: Record<string, string>;
+  parameters: Record<string, string>;
+}
+
 export interface JobConfig {
   name: string;
   schedule: string;
@@ -24,7 +31,16 @@ export interface JobConfig {
   timezone?: string;
   concurrency: ConcurrencyConfig;
   retry: RetryConfig;
+  ifSuccess?: JobFollowUpConfig;
+  ifFailed?: JobFollowUpConfig;
 }
+
+export type RawJobFollowUpConfig = string | {
+  job: string;
+  args?: string[];
+  env?: Record<string, string>;
+  parameters?: Record<string, string>;
+};
 
 export interface RawJobConfig {
   schedule: string;
@@ -40,6 +56,8 @@ export interface RawJobConfig {
   timezone?: string;
   concurrency?: Partial<ConcurrencyConfig>;
   retry?: Partial<RetryConfig>;
+  if_success?: RawJobFollowUpConfig;
+  if_failed?: RawJobFollowUpConfig;
 }
 
 export interface CronYamlFile {
