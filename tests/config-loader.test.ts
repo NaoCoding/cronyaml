@@ -80,6 +80,18 @@ describe("configuration loader", () => {
     expect(() => loadConfig(undefined, directory)).toThrow(ConfigError);
   });
 
+  it("allows jobs without a schedule", () => {
+    const directory = tempProject();
+    writeFileSync(join(directory, "cron.yaml"), [
+      "version: 1",
+      "jobs:",
+      "  follow-up-only:",
+      "    command: echo follow-up",
+      "",
+    ].join("\n"));
+    expect(loadConfig(undefined, directory).jobs[0]?.schedule).toBeUndefined();
+  });
+
   it("loads success and failure follow-ups with runtime parameters", () => {
     const directory = tempProject();
     writeFileSync(join(directory, "cron.yaml"), [

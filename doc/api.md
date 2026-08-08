@@ -31,7 +31,7 @@ the file. Configuration failures throw `ConfigError`.
 
 | Method                    | Behavior                                                              |
 | ------------------------- | --------------------------------------------------------------------- |
-| `start()`                 | Schedules enabled jobs using their cron expressions and time zones.   |
+| `start()`                 | Schedules enabled jobs that define cron expressions and applies their time zones. |
 | `stop(timeoutMs = 30000)` | Stops schedules and waits for active jobs up to the timeout.          |
 | `executeJob(name)`        | Runs a named job immediately, including disabled jobs.                |
 | `getState(name)`          | Returns running count and the latest start, finish, and result state. |

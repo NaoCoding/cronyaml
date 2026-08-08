@@ -25,7 +25,6 @@ jobs:
 
   # This job is invoked by if_success and does not need its own schedule.
   send-form-response-email:
-    schedule: "0 0 1 1 *"
     enabled: false
     command: "node ../gmail/send-email.js"
     env:

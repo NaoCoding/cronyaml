@@ -19,7 +19,7 @@ const rawFollowUpSchema = z.union([
 ]);
 
 export const rawJobSchema = z.object({
-  schedule: z.string().min(1),
+  schedule: z.string().min(1).optional(),
   command: z.string().min(1).optional(),
   source: z.string().url().optional(),
   runtime: z.enum(["bash", "sh", "node", "python", "powershell"]).optional(),

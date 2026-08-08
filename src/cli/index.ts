@@ -46,7 +46,7 @@ program.command("validate")
     console.log("CronYAML configuration\n");
     for (const job of config.jobs) {
       console.log(`${pc.cyan(job.name)}${job.enabled ? "" : " (disabled)"}`);
-      console.log(`  Schedule: ${job.schedule}`);
+      console.log(`  Schedule: ${job.schedule ?? "manual/follow-up only"}`);
       if (job.source) console.log(`  Source: ${job.source}`);
       if (job.timezone) console.log(`  Timezone: ${job.timezone}`);
       console.log();
@@ -60,7 +60,7 @@ program.command("list")
   .action((options: { file?: string }) => {
     const config = loadConfig(options.file);
     console.log("NAME\tSCHEDULE\tSOURCE\tTIMEZONE\tENABLED");
-    for (const job of config.jobs) console.log(`${job.name}\t${job.schedule}\t${job.source ? "github" : "command"}\t${job.timezone ?? "local"}\t${job.enabled ? "yes" : "no"}`);
+    for (const job of config.jobs) console.log(`${job.name}\t${job.schedule ?? "manual-only"}\t${job.source ? "github" : "command"}\t${job.timezone ?? "local"}\t${job.enabled ? "yes" : "no"}`);
   });
 
 program.command("exec <job>")

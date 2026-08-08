@@ -32,8 +32,9 @@ npx cronyaml run backup report --file config/cron.yaml
 ```
 
 `validate` always checks disabled jobs. `run` schedules only jobs whose
-`enabled` value is true; naming jobs on the command line further filters that
-set. `exec` is manual and can execute a disabled job.
+`enabled` value is true and have a `schedule`; naming jobs on the command line
+further filters that set. Jobs without a schedule remain available to `exec`
+and conditional follow-ups. `exec` is manual and can execute a disabled job.
 
 The scheduler handles `SIGINT` and `SIGTERM` gracefully: it stops new
 schedules, waits for active jobs for up to 30 seconds, and then exits.

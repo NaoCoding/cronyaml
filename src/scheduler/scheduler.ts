@@ -25,7 +25,8 @@ export class CronYamlScheduler {
 
   start(): void {
     this.stopping = false;
-    for (const job of this.config.jobs.filter((item) => item.enabled)) {
+    for (const job of this.config.jobs.filter((item) => item.enabled && item.schedule !== undefined)) {
+      if (!job.schedule) continue;
       const task = cron.schedule(job.schedule, () => { void this.trigger(job); }, job.timezone ? { timezone: job.timezone } : undefined);
       this.tasks.set(job.name, task);
     }

@@ -20,7 +20,7 @@ export interface JobFollowUpConfig {
 
 export interface JobConfig {
   name: string;
-  schedule: string;
+  schedule?: string;
   command?: string;
   source?: string;
   runtime?: ScriptRuntime;
@@ -47,7 +47,7 @@ export type RawJobFollowUpConfig = string | {
 };
 
 export interface RawJobConfig {
-  schedule: string;
+  schedule?: string;
   command?: string;
   source?: string;
   runtime?: ScriptRuntime;

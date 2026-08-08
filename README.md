@@ -94,7 +94,7 @@ Use `--file` to override discovery, for example `cronyaml run --file config/jobs
 
 ## Configuration
 
-Required fields are `version: 1`, `jobs`, `schedule`, and exactly one of `command` or `source`. Jobs can also set `cwd`, `env`, `enabled`, `timezone`, `timeout`, `retry`, `concurrency`, `args`, `if_success`, and `if_failed`. Remote jobs additionally support `runtime`.
+Required fields are `version: 1`, `jobs`, and exactly one of `command` or `source`. `schedule` is optional: omit it for a job that should only run through `exec` or a conditional follow-up. Jobs can also set `cwd`, `env`, `enabled`, `timezone`, `timeout`, `retry`, `concurrency`, `args`, `if_success`, and `if_failed`. Remote jobs additionally support `runtime`.
 
 Relative `cwd` paths are resolved from the directory containing `cron.yaml`. The scheduler validates all enabled and disabled jobs before starting.
 

@@ -163,7 +163,7 @@ export function loadConfig(file?: string, cwd = process.cwd()): ValidatedConfig 
 
   const jobs: JobConfig[] = Object.entries(raw.jobs).map(([name, job]) => {
     if (!NAME_PATTERN.test(name) || name.length > 100) throw new ConfigError(`jobs.${name}: invalid job name`);
-    if (!isCronValid(job.schedule)) throw new ConfigError(`jobs.${name}.schedule: invalid cron expression: ${JSON.stringify(job.schedule)}`);
+    if (job.schedule !== undefined && !isCronValid(job.schedule)) throw new ConfigError(`jobs.${name}.schedule: invalid cron expression: ${JSON.stringify(job.schedule)}`);
     const timezone = job.timezone ?? raw.defaults?.timezone;
     if (timezone) validateTimezone(timezone, `jobs.${name}.timezone`);
     const timeout = job.timeout ?? raw.defaults?.timeout;

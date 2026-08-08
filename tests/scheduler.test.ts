@@ -30,6 +30,14 @@ describe("scheduler", () => {
     void scheduler.stop();
   });
 
+  it("does not schedule jobs without a schedule", async () => {
+    const manualOnly: JobConfig = { ...job, name: "manual-only", schedule: undefined };
+    const scheduler = new CronYamlScheduler({ ...config, jobs: [manualOnly] });
+    scheduler.start();
+    expect(scheduler.getState("manual-only")?.runningCount).toBe(0);
+    await scheduler.stop();
+  });
+
   it("runs the success follow-up and passes templated args and parameters", async () => {
     const source: JobConfig = {
       ...job,

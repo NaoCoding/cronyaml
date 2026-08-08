@@ -6,8 +6,9 @@ title: Configuration reference
 # Configuration reference
 
 CronYAML reads YAML with a required `version: 1` and a non-empty `jobs`
-mapping. Every job needs a cron `schedule` and exactly one of `command` or
-`source`.
+mapping. Every job needs exactly one of `command` or `source`. A cron
+`schedule` is optional for jobs that should only run manually or as conditional
+follow-ups.
 
 ## Complete example
 
@@ -75,6 +76,9 @@ jobs:
 | `concurrency.policy` | `allow`          | `allow` permits overlap; `forbid` skips a scheduled run already in progress.       |
 | `if_success`         | none             | Run another configured job after this job succeeds.                                  |
 | `if_failed`          | none             | Run another configured job after this job fails, after all retries are exhausted.    |
+
+Jobs without `schedule` are not registered by `cronyaml run`, but remain valid
+targets for `cronyaml exec` and conditional follow-ups.
 
 Job names may contain letters, numbers, `.`, `_`, and `-`, and may be up to 100
 characters long.
